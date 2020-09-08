@@ -148,9 +148,9 @@ public class Flow {
         FlowNode fnode;
 
         System.out.println(toString());
-        System.out.println("PATH :: " + pathSGP.getEdgeList().size() + " HOP(S) :: " 
+        System.out.println("PATH :: " + pathSGP.getEdgeList().size() + " HOP(S) :: "
                 + pathSGP.toString());
-        System.out.println("BACKUP PATH :: " + backupPathSGP.getEdgeList().size() 
+        System.out.println("BACKUP PATH :: " + backupPathSGP.getEdgeList().size()
                 + " HOP(S) :: " + backupPathSGP.toString());
 
 //        System.out.print("FLOW NODES :: ");
@@ -300,13 +300,89 @@ public class Flow {
         info(this.seCount + " segment endpoints set for flow " + getFlowId());
     }
 
+    private class NodeComparator implements Comparator<Node> {
+
+        @Override
+        public int compare(Node a, Node b) {
+            // descending order of number of co-flow hops
+            return b.getNumFlows() - a.getNumFlows();
+        }
+    }
+    
+    private List<Node> findSegmentEndPoints(int maxSLD) {
+        
+        List<Node> segmentEndPoints = new ArrayList<>();
+        int seCount = 0;
+        
+        Iterator primaryNodesItr = pathSGP.getVertexList().iterator();
+        List<Node> backupNodes = backupPathSGP.getVertexList();
+        
+        // add the destination node as one of the segment end points by default
+        segmentEndPoints.add(dst);
+        seCount++;
+        
+        Node nextNode;
+        while(primaryNodesItr.hasNext()) {
+            nextNode = (Node) primaryNodesItr.next();
+            
+            // skip the source node
+            if(nextNode.equals(src)) {
+                continue;
+            }
+            
+            // skip destination node as it has already been added
+            // and exit since we've already reached the destination
+            if(nextNode.equals(dst)) {
+                break;
+            }
+            
+            if(backupNodes.contains(nextNode)) {
+                segmentEndPoints.add(nextNode);
+                seCount++;
+            }
+        }
+        
+        if(seCount <= maxSLD) {
+            return segmentEndPoints;
+        }
+        
+        // sort the segment endpoints based on the number
+        // of flows routed through them (in decreasing order)
+        Collections.sort(segmentEndPoints, new NodeComparator());
+        
+        seCount = 0;
+        
+        // now pick the top maxSLD segment endpoints
+        List<Node> finalSegmentEndPoints = new ArrayList<>();
+        
+        // add the destination node by default
+        finalSegmentEndPoints.add(dst); 
+        seCount++;
+        
+        Iterator seItr = segmentEndPoints.iterator();
+        while(seItr.hasNext() & (seCount < maxSLD)) {
+            nextNode = (Node) seItr.next();
+            if(dst.equals(nextNode)) {
+                continue;
+            }
+            
+            finalSegmentEndPoints.add(nextNode);
+            seCount++;
+        }
+        
+        return finalSegmentEndPoints;
+        
+    }
+    
     // Take the primary and backup paths of the flow and divide them into
     // protected segments for SGP (Segment-Based Protection)
-    protected void segmentizeSGP() {
+    protected void segmentizeSGP(int maxSLD) {
+        
+        List<Node> sePoints = findSegmentEndPoints(maxSLD);
+        
 
 //        System.out.println("Segmentizing Flow " + flowId);
 //        prettyPrint();
-
         List<Node> primaryNodes = pathSGP.getVertexList();
         List<Link> primaryEdges = pathSGP.getEdgeList();
 
@@ -340,8 +416,9 @@ public class Flow {
 
             segNodes.add(nextNode);
 
-            if (backupNodes.contains(nextNode)) {
-                // this node exists in both primary & backup. 
+            // check if this node is a segment endpoint
+            if (sePoints.contains(nextNode)) {
+                // this node exists in both primary & backup and is a segment endpoint. 
                 // finalize the segment at this node and create the next segement
 
                 newPrimary = new NetGraphPath(segNodes, segEdges);
@@ -373,7 +450,6 @@ public class Flow {
                         newSegment.setBackup(newBackup);
 
                         // newSegment.prettyPrint();
-
                         break;
                     }
 
@@ -439,21 +515,21 @@ public class Flow {
 
         return plen;
     }
-    
+
     public int getOpstate() {
         int opstate = Network.OPSTATE_UP;
-        
+
         for (Segment seg : segmentsSGP) {
             if (seg.getOpstate() == Network.OPSTATE_DOWN) {
                 // if any of the segments are down, then the flow's opstate is down
                 return Network.OPSTATE_DOWN;
-            } 
+            }
             if (seg.getOpstate() == Network.OPSTATE_BACKUP) {
                 // if any of the segments are using backup, flow is in backup state
                 opstate = Network.OPSTATE_BACKUP;
             }
-        }  
-        
+        }
+
         return opstate;
     }
 }

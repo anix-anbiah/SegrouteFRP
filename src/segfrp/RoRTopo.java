@@ -40,8 +40,6 @@ public class RoRTopo {
 
         coreRing = new Ring(ringSize, height, CORE_RING_ID, true, null, p);
 
-        System.out.println("Number of entities in Sim_system = "
-                + Sim_system.get_num_entities());
 
         System.out.println("Added " + net.nodes.size() + " nodes and "
                 + net.getGraph().edgeSet().size() + " links ");

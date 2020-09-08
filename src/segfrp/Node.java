@@ -12,7 +12,6 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Collection;
-import eduni.simjava.*;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Level;
@@ -36,7 +35,6 @@ public class Node {
 
     private final static Logger logger = Logger.getLogger(Node.class.getName());
 
-    private Controller controller;
     private Network net;
     private Graph<Node, Link> graph;
     private FwdTable domainFwdTable; // forwarding table for domain partitioning method
@@ -592,7 +590,7 @@ public class Node {
 
     }
 
-    protected int getNumFlowNodes() {
+    protected int getNumFlows() {
         return flowNodes.size();
     }
 

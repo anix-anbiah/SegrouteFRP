@@ -7,10 +7,6 @@ package segfrp;
 
 import java.util.List;
 import java.util.ArrayList;
-import eduni.simjava.Sim_system;
-import static segfrp.Network.warning;
-import java.io.File;
-import java.io.IOException;
 import java.io.PrintWriter;
 
 /**
@@ -61,7 +57,7 @@ public class Controller {
         int netId = 0;
 
         // Initialise Sim_system
-        Sim_system.initialise();
+//        Sim_system.initialise();
 
         netName = args[0];
         topo = args[1];
