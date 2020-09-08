@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.logging.Logger;
-import eduni.simjava.Sim_system;
 import java.awt.Color;
 import java.io.File;
 import java.util.logging.Level;
@@ -189,7 +188,7 @@ public class Network {
         if ("inet".equals(topo)) {
             outDir = "OUT/" + p + "P/" + ftTopoK + "N/" + numFlows + "F/";
         } else {
-            outDir = "OUT/" + topo + "/" + p + "P/" + numfails + "X/" + numFlows + "F/";
+            outDir = "OUT/" + topo + "/" + p + "S/" + numfails + "X/" + numFlows + "F/";
         }
 
         File directory = new File(String.valueOf(outDir));
@@ -408,7 +407,7 @@ public class Network {
 
         segments.add(seg);
 
-        // System.out.println("Created Segment with ID " + segId);
+//        System.out.println("Created Segment with ID " + segId);
         return seg;
     }
 
@@ -603,12 +602,15 @@ public class Network {
         // dump Flow Op stats
         
         dumpln("# OPSTAT Numflows " + numFlows + " :: NumFailures " + numfails +
+                " :: MaxSLD " + maxSLD +
                 " :: Dropped " + numDroppedFlows + 
                 " :: PercentageDropped " + percentageDroppedFlows +
-                " :: Backup " + numBackupFlows + " :: AvgPathLen " +
-                avgPathLen + " :: CumulativePrimaryPathLen " + cumulPrimaryPathLen +
-                " :: CumulativeOpPathLen " +
-                cumulOpPathLen + " :: PercentIncrease " + percentagePathLenIncrease);
+                " :: Backup " + numBackupFlows + 
+                " :: PercentageBackup " + percentageBackupFlows + 
+                " :: AvgPathLen " + avgPathLen + 
+                " :: CumulativePrimaryPathLen " + cumulPrimaryPathLen +
+                " :: CumulativeOpPathLen " + cumulOpPathLen + 
+                " :: PercentIncrease " + percentagePathLenIncrease);
         
         
 //        dumpln("# Max FTS = " + maxDomainFwdTableSize
@@ -860,7 +862,7 @@ public class Network {
         Flow flow = new Flow(this, src, dst, bitRate, flows.size() + 1, gp, disjointPaths.get(1));
 
         // segmentize the flow
-        flow.segmentizeSGP();
+        flow.segmentizeSGP(this.maxSLD);
 
         flows.put(flowId, flow);
 
@@ -1156,9 +1158,9 @@ public class Network {
         }
     }
 
-    public static double clock() {
-        return Sim_system.clock();
-    }
+//    public static double clock() {
+//        return Sim_system.clock();
+//    }
 
     private void updateFwdEntryCount() {
 
@@ -1200,8 +1202,8 @@ public class Network {
         int maxFlows = 0;
 
         for (Node n : nodes.values()) {
-            if (n.getNumFlowNodes() > maxFlows) {
-                maxFlows = n.getNumFlowNodes();
+            if (n.getNumFlows() > maxFlows) {
+                maxFlows = n.getNumFlows();
             }
         }
 
@@ -1228,7 +1230,7 @@ public class Network {
             if (nodeCount++ < numNodes) {
                 continue;
             } else {
-                return n.getNumFlowNodes();
+                return n.getNumFlows();
             }
         }
         return 0.0;
@@ -1241,6 +1243,7 @@ public class Network {
     private int cumulOpPathLen;
     private double avgPathLen;
     private double percentagePathLenIncrease;
+    private double percentageBackupFlows;
 
     // dump the operational stats for the flows
     public void updateFlowOpstats() {
@@ -1270,6 +1273,7 @@ public class Network {
 
         System.out.println("Total number of flows = " + flows.size());
         
+        percentageBackupFlows = Util.percentage(numBackupFlows, flows.size());
         percentageDroppedFlows = Util.percentage(numDroppedFlows, flows.size());
         System.out.println("Number of dropped flows " + numDroppedFlows + " ("
                 + percentageDroppedFlows + "%)");
