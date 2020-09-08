@@ -293,7 +293,7 @@ public class Network {
         //fail a random link
         simulateLinkFailures();
 
-        dumpFlowOpstats();
+        updateFlowOpstats();
 
         prettyPrint();
 
@@ -598,120 +598,102 @@ public class Network {
         dumpln("# FT Topology K = " + ftTopoK + "; H = " + ftTopoH);
         dumpln("# Num of Flows = " + numFlows);
         dumpln("# Num of nodes = " + nodes.size() + "; Num of Links = " + graph.edgeSet().size());
-        dumpln("# Num of Partitions = " + this.p);
-        dumpln("# Max SLD = " + Traffic.getMaxStackSize(FTS_OPT_HEURISTIC));
-        dumpln("# Max FTS = " + maxDomainFwdTableSize
-                + " (Domain) :: " + maxHeuristicFwdTableSize + " (Heuristic); Avg "
-                + avgHeuristicFwdTableSize + " Total " + totalHeuristicFwdEntries + " :: Objective ");
-        dumpln("# Time Taken for Path Computation = " + (long) (hcStartTime - pcStartTime) / 1000000 + " msecs;"
-                + " Heuristic Calculation = " + (long) (hcEndTime - hcStartTime) / 1000000 + " msecs: "
-                + (double) ((int) ((hcEndTime - hcStartTime) * 10000 / (1000000 * numFlows))) / 10000.0 + " per flow");
-        dumpln("");
-        dumpln("");
-        dumpln("data;"); // enter AMPL data mode
-        dumpln("");
+        dumpln("# Max SLD = " + maxSLD);
+        
+        // dump Flow Op stats
+        
+        dumpln("# OPSTAT Numflows " + numFlows + " :: NumFailures " + numfails +
+                " :: Dropped " + numDroppedFlows + 
+                " :: PercentageDropped " + percentageDroppedFlows +
+                " :: Backup " + numBackupFlows + " :: AvgPathLen " +
+                avgPathLen + " :: CumulativePrimaryPathLen " + cumulPrimaryPathLen +
+                " :: CumulativeOpPathLen " +
+                cumulOpPathLen + " :: PercentIncrease " + percentagePathLenIncrease);
+        
+        
+//        dumpln("# Max FTS = " + maxDomainFwdTableSize
+//                + " (Domain) :: " + maxHeuristicFwdTableSize + " (Heuristic); Avg "
+//                + avgHeuristicFwdTableSize + " Total " + totalHeuristicFwdEntries + " :: Objective ");
+//        dumpln("# Time Taken for Path Computation = " + (long) (hcStartTime - pcStartTime) / 1000000 + " msecs;"
+//                + " Heuristic Calculation = " + (long) (hcEndTime - hcStartTime) / 1000000 + " msecs: "
+//                + (double) ((int) ((hcEndTime - hcStartTime) * 10000 / (1000000 * numFlows))) / 10000.0 + " per flow");
+//        dumpln("");
+//        dumpln("");
+//        dumpln("data;"); // enter AMPL data mode
+//        dumpln("");
+//
+//        // Now dump the parameters
+//        // first, dump the network parameter
+//        dumpln("param sld := " + this.maxSLD + ";");
+//        dumpln("");
 
-        // Now dump the parameters
-        // first, dump the network parameter
-        dumpln("param sld := " + this.maxSLD + ";");
-        dumpln("");
-
-        if ("inet".equals(topo)) {
-            // For INET mesh topology, no need to dump the 
-            // stuff required to run AMPL
-            return;
-        }
-
-        if (numFlows > 1000) {
-            // For large number of flows, no need to dump
-            // the stuff required for AMPL
-            return;
-        }
+//        if ("inet".equals(topo)) {
+//            // For INET mesh topology, no need to dump the 
+//            // stuff required to run AMPL
+//            return;
+//        }
+//
+//        if (numFlows > 1000) {
+//            // For large number of flows, no need to dump
+//            // the stuff required for AMPL
+//            return;
+//        }
 
 //        dump("set NETWORK := " + name);
 //        dumpln(";");
 //        dumpln("");
         // next, dump out the nodes
-        dump("set NODES :=");
-        nodeString = "";
-        for (Node n : nodes.values()) {
-            nodeString += (" " + n.name);
-        }
 
-        dumpln(nodeString + ";");
-        dumpln("");
-
-//        dump("set LINKS :=");
-//        linkString = "";
-//        Iterator linkItr = graph.edgeSet().iterator();
-//        while (linkItr.hasNext()) {
-//            l = (Link) linkItr.next();
-//            linkString += (" (" + l.getFrom().name + ", " + l.getTo().name + ")");
-//            linkString += (" (" + l.getTo().name + ", " + l.getFrom().name + ")");
-//
-//        }
-//
-//        dumpln(linkString + ";");
-//        dumpln("");
-//        dump("set FLOW_ENDPOINTS :=");
-//        for (Flow f : flows.values()) {
-//            dump(" (" + f.getSrc().name + ", " + f.getDst().name + ")");
-//        }
-//        dumpln(";");
-//        dumpln("");
-        dump("set FLOWS :=");
-        for (Flow f : flows.values()) {
-            dump(" " + f.toString());
-        }
-        dumpln(";");
-        dumpln("");
-
-        dump("param path: " + nodeString + ":= ");
-        List<Node> flowNodeList;
-        int index;
-
-        for (Flow f : flows.values()) {
-
-//            System.out.println("Getting node list for flow " + f.toString());
-//            f.prettyPrint();
-            flowNodeList = f.getNodeList();
-
-            dumpln("");
-
-            dump(f.toString());
-
-            for (Node n : nodes.values()) {
-                index = flowNodeList.indexOf(n);
-                if (index == -1) {
-                    dump(" 0");
-                } else {
-                    dump(" " + (index + 1));
-                }
-            }
-        }
-        dumpln(";");
-        dumpln("");
-
-//        // next, capacities of the nodes
-//        dump("param capacity :=");
+//        dump("set NODES :=");
+//        nodeString = "";
 //        for (Node n : nodes.values()) {
-//            dump(" " + n.name + " " + n.capacity);
+//            nodeString += (" " + n.name);
+//        }
+//
+//        dumpln(nodeString + ";");
+//        dumpln("");
+//
+////        dump("set LINKS :=");
+////        linkString = "";
+////        Iterator linkItr = graph.edgeSet().iterator();
+////        while (linkItr.hasNext()) {
+////            l = (Link) linkItr.next();
+////            linkString += (" (" + l.getFrom().name + ", " + l.getTo().name + ")");
+////            linkString += (" (" + l.getTo().name + ", " + l.getFrom().name + ")");
+////
+////        }
+////
+////        dumpln(linkString + ";");
+////        dumpln("");
+////        dump("set FLOW_ENDPOINTS :=");
+////        for (Flow f : flows.values()) {
+////            dump(" (" + f.getSrc().name + ", " + f.getDst().name + ")");
+////        }
+////        dumpln(";");
+////        dumpln("");
+//        dump("set FLOWS :=");
+//        for (Flow f : flows.values()) {
+//            dump(" " + f.toString());
 //        }
 //        dumpln(";");
 //        dumpln("");
+//
 //        dump("param path: " + nodeString + ":= ");
-//        List<Node> path;
+//        List<Node> flowNodeList;
 //        int index;
 //
 //        for (Flow f : flows.values()) {
-//            path = f.getPath().getVertexList();
+//
+////            System.out.println("Getting node list for flow " + f.toString());
+////            f.prettyPrint();
+//            flowNodeList = f.getNodeList();
 //
 //            dumpln("");
 //
 //            dump(f.toString());
 //
 //            for (Node n : nodes.values()) {
-//                index = path.indexOf(n);
+//                index = flowNodeList.indexOf(n);
 //                if (index == -1) {
 //                    dump(" 0");
 //                } else {
@@ -722,19 +704,49 @@ public class Network {
 //        dumpln(";");
 //        dumpln("");
 //
-//        dumpln(";");
+////        // next, capacities of the nodes
+////        dump("param capacity :=");
+////        for (Node n : nodes.values()) {
+////            dump(" " + n.name + " " + n.capacity);
+////        }
+////        dumpln(";");
+////        dumpln("");
+////        dump("param path: " + nodeString + ":= ");
+////        List<Node> path;
+////        int index;
+////
+////        for (Flow f : flows.values()) {
+////            path = f.getPath().getVertexList();
+////
+////            dumpln("");
+////
+////            dump(f.toString());
+////
+////            for (Node n : nodes.values()) {
+////                index = path.indexOf(n);
+////                if (index == -1) {
+////                    dump(" 0");
+////                } else {
+////                    dump(" " + (index + 1));
+////                }
+////            }
+////        }
+////        dumpln(";");
+////        dumpln("");
+////
+////        dumpln(";");
+////        dumpln("");
+////
+////        // finally, dump the rate of all the flows
+////        dumpln("param rate " + ":= ");
+////        for (Flow f : flows.values()) {
+////            dump(" " + f.toString() + " " + f.getBitRate());
+////        }
+////        dumpln(";");
 //        dumpln("");
-//
-//        // finally, dump the rate of all the flows
-//        dumpln("param rate " + ":= ");
-//        for (Flow f : flows.values()) {
-//            dump(" " + f.toString() + " " + f.getBitRate());
-//        }
-//        dumpln(";");
-        dumpln("");
-        dumpln("option solver gurobi;"); // Use Gurobi solver;
-        dumpln("solve;"); // Instruct AMPL to solve this file
-        dumpln("display sld;");
+//        dumpln("option solver gurobi;"); // Use Gurobi solver;
+//        dumpln("solve;"); // Instruct AMPL to solve this file
+//        dumpln("display sld;");
 //        dumpln("display FLOW_ENDPOINTS;");
 //        dumpln("display fte;");
 //        dumpln("display flowlabel;");
@@ -1221,19 +1233,27 @@ public class Network {
         }
         return 0.0;
     }
+    
+    private int numDroppedFlows;
+    private double percentageDroppedFlows;
+    private int numBackupFlows;
+    private int cumulPrimaryPathLen;
+    private int cumulOpPathLen;
+    private double avgPathLen;
+    private double percentagePathLenIncrease;
 
     // dump the operational stats for the flows
-    public void dumpFlowOpstats() {
+    public void updateFlowOpstats() {
 
         int numFlows = flows.size();
-        int numDownFlows = 0; // number of flows with operational state DOWN
-        int numBackupFlows = 0; // number of flows in BACKUP state
-        int cumulPrimaryPathLen = 0; // cumulative primary path length
-        int cumulOpPathLen = 0; //cumulative operational path length
+        numDroppedFlows = 0; // number of flows with operational state DOWN
+        numBackupFlows = 0; // number of flows in BACKUP state
+        cumulPrimaryPathLen = 0; // cumulative primary path length
+        cumulOpPathLen = 0; //cumulative operational path length
 
         for (Flow flow : flows.values()) {
             if (flow.getOpstate() == Network.OPSTATE_DOWN) {
-                numDownFlows++;
+                numDroppedFlows++;
                 continue;
             }
 
@@ -1249,19 +1269,23 @@ public class Network {
         System.out.println("============================");
 
         System.out.println("Total number of flows = " + flows.size());
-        System.out.println("Number of dropped flows " + numDownFlows + " ("
-                + Util.percentage(numDownFlows, flows.size()) + ")");
+        
+        percentageDroppedFlows = Util.percentage(numDroppedFlows, flows.size());
+        System.out.println("Number of dropped flows " + numDroppedFlows + " ("
+                + percentageDroppedFlows + "%)");
 
         System.out.println("Total number of segments = " + segments.size());
 
         System.out.println("Number of flows in BACKUP state " + numBackupFlows);
 
-        System.out.println("Average flow path length = " + Util.ratio(cumulPrimaryPathLen, flows.size()));
+        avgPathLen = Util.ratio(cumulPrimaryPathLen, flows.size());
+        System.out.println("Average flow path length = " + avgPathLen);
         System.out.println("Cumulative primary path length = " + cumulPrimaryPathLen);
         System.out.println("Cumulative operational path length = " + cumulOpPathLen);
 
+        percentagePathLenIncrease = Util.percentage(cumulOpPathLen - cumulPrimaryPathLen, cumulPrimaryPathLen);
         System.out.println("Percentage increase = "
-                + Util.percentage(cumulOpPathLen - cumulPrimaryPathLen, cumulPrimaryPathLen));
+                + percentagePathLenIncrease + "%");
 
     }
 

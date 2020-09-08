@@ -11,13 +11,13 @@ package segfrp;
  */
 public class Util {
     
-    public static String percentage(double num, double den) {
+    public static double percentage(double num, double den) {
         
         double percentage = (num * 100.0) /den;
         
         percentage = ((int) (percentage * 100.0)) / 100.0;
         
-        return percentage + "%";
+        return percentage;
     }
     
     public static double ratio(double num, double den) {
