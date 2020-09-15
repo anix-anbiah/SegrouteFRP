@@ -130,9 +130,8 @@ public class Network {
     int numfails; // number of failures to simulate
     int maxSLD; // max segment list depth allowed
 
-    private long pcStartTime;  // starting time of path computation (PC)
-    private long hcStartTime; // starting time of heuristic calculation (HC) / end time of PC
-    private long hcEndTime;   // end time of HC
+    private long startTime;  // starting time of path computation (PC)
+    private long endTime;   // end time of HC
 
     DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
     // private boolean DERIVE_SLD_FROM_P = true;
@@ -199,6 +198,8 @@ public class Network {
             if (!directory.exists()) {
                 System.out.println("Directory did not get created");
             }
+        } else {
+            System.out.println("Directory already exists " + outDir);
         }
 
         try {
@@ -226,7 +227,7 @@ public class Network {
 
         networkTest = new NetworkTest(this, topo, ftTopoK, ftTopoH, numFlows, p, heuristic);
 
-        this.pcStartTime = System.nanoTime();
+        this.startTime = System.nanoTime();
 
         // System.out.println("Dumping all pairs path lengths");
         networkTest.addTopoAndInitialFlows();
@@ -293,6 +294,8 @@ public class Network {
         simulateLinkFailures();
 
         updateFlowOpstats();
+
+        this.endTime = System.nanoTime();
 
         prettyPrint();
 
@@ -441,9 +444,17 @@ public class Network {
 
     private void simulateLinkFailures() {
 
+        Link lnk;
+        Collections.sort(linksInUse, new LinkComparator());
+
         System.out.println("Failing " + numfails + " links");
+
+        int range;
         for (int i = 0; i < numfails; i++) {
-            failRandomLink();
+
+            //range = (numfails * 2 + i) < linksInUse.size() ? (numfails * 2 + i) : linksInUse.size();
+            range = linksInUse.size();
+            failRandomLink(range);
         }
     }
 
@@ -598,21 +609,23 @@ public class Network {
         dumpln("# Num of Flows = " + numFlows);
         dumpln("# Num of nodes = " + nodes.size() + "; Num of Links = " + graph.edgeSet().size());
         dumpln("# Max SLD = " + maxSLD);
-        
+
         // dump Flow Op stats
-        
-        dumpln("# OPSTAT Numflows " + numFlows + " :: NumFailures " + numfails +
-                " :: MaxSLD " + maxSLD +
-                " :: Dropped " + numDroppedFlows + 
-                " :: PercentageDropped " + percentageDroppedFlows +
-                " :: Backup " + numBackupFlows + 
-                " :: PercentageBackup " + percentageBackupFlows + 
-                " :: AvgPathLen " + avgPathLen + 
-                " :: CumulativePrimaryPathLen " + cumulPrimaryPathLen +
-                " :: CumulativeOpPathLen " + cumulOpPathLen + 
-                " :: PercentIncrease " + percentagePathLenIncrease);
-        
-        
+        dumpln("# OPSTAT Numflows " + numFlows + " :: NumFailures " + numfails
+                + " :: MaxSLD " + maxSLD
+                + " :: Dropped " + numDroppedFlows
+                + " :: PercentageDropped " + percentageDroppedFlows
+                + " :: Backup " + numBackupFlows
+                + " :: PercentageBackup " + percentageBackupFlows
+                + " :: AvgPrimaryPathLen " + avgPrimaryPathLen
+                + " :: AvgBackupPathLen " + avgBackupPathLen
+                //                + " :: CumulativePrimaryPathLen " + cumulPrimaryPathLen
+                //                + " :: CumulativeOpPathLen " + cumulOpPathLen
+                + " :: PercentIncrease " + percentagePathLenIncrease
+                + " :: AvgOpPrimaryPathLen " + avgOpPrimaryPathLen
+                + " :: AvgOpPathLen " + avgOpPathLen
+                + " :: PerceptOpIncrease " + percentageOpPathLenIncrease);
+
 //        dumpln("# Max FTS = " + maxDomainFwdTableSize
 //                + " (Domain) :: " + maxHeuristicFwdTableSize + " (Heuristic); Avg "
 //                + avgHeuristicFwdTableSize + " Total " + totalHeuristicFwdEntries + " :: Objective ");
@@ -628,7 +641,6 @@ public class Network {
 //        // first, dump the network parameter
 //        dumpln("param sld := " + this.maxSLD + ";");
 //        dumpln("");
-
 //        if ("inet".equals(topo)) {
 //            // For INET mesh topology, no need to dump the 
 //            // stuff required to run AMPL
@@ -640,12 +652,10 @@ public class Network {
 //            // the stuff required for AMPL
 //            return;
 //        }
-
 //        dump("set NETWORK := " + name);
 //        dumpln(";");
 //        dumpln("");
         // next, dump out the nodes
-
 //        dump("set NODES :=");
 //        nodeString = "";
 //        for (Node n : nodes.values()) {
@@ -867,8 +877,8 @@ public class Network {
         flows.put(flowId, flow);
 
         // mark the links used by this flow to be 'in use'
-        markLinksInUse(gp);
-        markLinksInUse(disjointPaths.get(1));
+        markLinksInUse(flow, gp);
+        markLinksInUse(flow, disjointPaths.get(1));
 
 //        System.out.println("Created Flow " + flowId);
 //        flow.prettyPrint();
@@ -890,21 +900,44 @@ public class Network {
         return flow;
     }
 
-    public void markLinksInUse(GraphPath<Node, Link> gp) {
+    public void markLinksInUse(Flow flow, GraphPath<Node, Link> gp) {
 
         for (Link lnk : gp.getEdgeList()) {
-            linksInUse.add(lnk);
+            if (!linksInUse.contains(lnk)) {
+                linksInUse.add(lnk);
+            }
+
+            // add the flow to the link
+            lnk.addFlow(flow);
         }
     }
 
-    public void failRandomLink() {
-        Link lnk = linksInUse.get((int) (Math.random() * linksInUse.size()));
+    private class LinkComparator implements Comparator<Link> {
+
+        @Override
+        public int compare(Link a, Link b) {
+            // descending order of number of flows carried by the link
+            return b.getNumFlows() - a.getNumFlows();
+        }
+    }
+
+    public void failRandomLink(int range) {
+
+        System.out.println("Fail Random Link. Range = " + range);
+        int index = (int) (Math.random() * range);
+        Link lnk = linksInUse.get(index);
+
         while (lnk.getOpstate() == Network.OPSTATE_DOWN) {
-            System.out.println("failRandomLink: link is alredy down, finding another link");
-            lnk = linksInUse.get((int) (Math.random() * linksInUse.size()));
+            System.out.println("failRandomLink: link is alredy down, finding another link; index = " + index
+                    + " Link = " + lnk.toString() + " Opstate = " + lnk.getOpstate());
+            index = (int) (Math.random() * range);
+            lnk = linksInUse.get(index);
         }
 
-        System.out.println("Failing random link " + lnk.toString());
+        System.out.println("Failing random link " + lnk.toString()
+                + " index = " + index
+                + " with "
+                + lnk.getNumFlows() + " flows");
         setLinkOpstate(lnk, Network.OPSTATE_DOWN);
     }
 
@@ -1161,7 +1194,6 @@ public class Network {
 //    public static double clock() {
 //        return Sim_system.clock();
 //    }
-
     private void updateFwdEntryCount() {
 
         maxDomainFwdTableSize = 0;
@@ -1235,15 +1267,24 @@ public class Network {
         }
         return 0.0;
     }
-    
+
     private int numDroppedFlows;
     private double percentageDroppedFlows;
+
     private int numBackupFlows;
-    private int cumulPrimaryPathLen;
-    private int cumulOpPathLen;
-    private double avgPathLen;
-    private double percentagePathLenIncrease;
     private double percentageBackupFlows;
+
+    private int cumulPrimaryPathLen;
+    private int cumulBackupPathLen;
+    private int cumulOpPrimaryPathLen;
+    private int cumulOpPathLen;
+    private double avgPrimaryPathLen;
+    private double avgBackupPathLen;
+    private double percentagePathLenIncrease;
+
+    private double avgOpPrimaryPathLen;
+    private double avgOpPathLen;
+    private double percentageOpPathLenIncrease;
 
     // dump the operational stats for the flows
     public void updateFlowOpstats() {
@@ -1252,9 +1293,15 @@ public class Network {
         numDroppedFlows = 0; // number of flows with operational state DOWN
         numBackupFlows = 0; // number of flows in BACKUP state
         cumulPrimaryPathLen = 0; // cumulative primary path length
+        cumulBackupPathLen = 0;
+        cumulOpPrimaryPathLen = 0;
         cumulOpPathLen = 0; //cumulative operational path length
 
         for (Flow flow : flows.values()) {
+
+            cumulPrimaryPathLen += flow.getPrimaryPathLength();
+            cumulBackupPathLen += flow.getBackupPathLength();
+
             if (flow.getOpstate() == Network.OPSTATE_DOWN) {
                 numDroppedFlows++;
                 continue;
@@ -1264,7 +1311,7 @@ public class Network {
                 numBackupFlows++;
             }
 
-            cumulPrimaryPathLen += flow.getPrimaryPathLength();
+            cumulOpPrimaryPathLen += flow.getPrimaryPathLength();
             cumulOpPathLen += flow.getOpPathLength();
         }
 
@@ -1273,23 +1320,46 @@ public class Network {
 
         System.out.println("Total number of flows = " + flows.size());
         
-        percentageBackupFlows = Util.percentage(numBackupFlows, flows.size());
+        if(flows.size() == numDroppedFlows) {
+            System.out.println("ALL FLOWS DROPPED!");
+            return; //bail
+        }
+
+        percentageBackupFlows = Util.percentage(numBackupFlows, flows.size() - numDroppedFlows);
         percentageDroppedFlows = Util.percentage(numDroppedFlows, flows.size());
         System.out.println("Number of dropped flows " + numDroppedFlows + " ("
                 + percentageDroppedFlows + "%)");
 
         System.out.println("Total number of segments = " + segments.size());
 
-        System.out.println("Number of flows in BACKUP state " + numBackupFlows);
+        System.out.println("Number of flows in BACKUP state " + numBackupFlows +
+                " (" + percentageBackupFlows + "%)");
 
-        avgPathLen = Util.ratio(cumulPrimaryPathLen, flows.size());
-        System.out.println("Average flow path length = " + avgPathLen);
-        System.out.println("Cumulative primary path length = " + cumulPrimaryPathLen);
-        System.out.println("Cumulative operational path length = " + cumulOpPathLen);
+        avgPrimaryPathLen = Util.ratio(cumulPrimaryPathLen, flows.size());
+        avgBackupPathLen = Util.ratio(cumulBackupPathLen, flows.size());
 
-        percentagePathLenIncrease = Util.percentage(cumulOpPathLen - cumulPrimaryPathLen, cumulPrimaryPathLen);
+        avgOpPrimaryPathLen = Util.ratio(cumulOpPrimaryPathLen, flows.size() - numDroppedFlows);
+        avgOpPathLen = Util.ratio(cumulOpPathLen, flows.size() - numDroppedFlows);
+
+        percentagePathLenIncrease = Util.percentage(cumulBackupPathLen - cumulPrimaryPathLen, cumulPrimaryPathLen);
+        percentageOpPathLenIncrease = Util.percentage(cumulOpPathLen - cumulOpPrimaryPathLen, cumulOpPrimaryPathLen);
+
+        System.out.println("============ Provisioned =================");
+        System.out.println("Average primary path length = " + avgPrimaryPathLen);
+        System.out.println("Average backup path length = " + avgBackupPathLen);
         System.out.println("Percentage increase = "
                 + percentagePathLenIncrease + "%");
+
+//        System.out.println("Cumulative provisioned primary path length = " + cumulPrimaryPathLen);
+//        System.out.println("Cumulative provisioned backup path length = " + cumulBackupPathLen);
+//
+//        System.out.println("Cumulative operational primary path length =" + cumulOpPrimaryPathLen);
+//        System.out.println("Cumulative operational path length = " + cumulOpPathLen);
+        System.out.println("============ Operational =================");
+        System.out.println("Average Op primary path length = " + avgOpPrimaryPathLen);
+        System.out.println("Average Op path length = " + avgOpPathLen);
+        System.out.println("Percentage Op increase = "
+                + percentageOpPathLenIncrease + "%");
 
     }
 

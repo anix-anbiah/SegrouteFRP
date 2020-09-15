@@ -18,6 +18,7 @@ public class Link {
     Network net;
     Node from, to;
     Port fromPort, toPort;
+    int numFlows; // number of flows using this link
     
     private int opstate; // operational state of link- it can be
                          //Network.OPSTATE_UP or DOWN
@@ -77,11 +78,22 @@ public class Link {
     }
     
     public int getOpstate() {
-        return opstate;
+        return this.opstate;
     }
     
     public void setOpstate(int opstate) {
         this.opstate = opstate;
+    }
+    
+    public void addFlow(Flow flow) {
+        // For now, we're not going to maintain the flows in a list
+        // 
+        // simply add to the number of flows using this link
+        numFlows++;
+    }
+    
+    public int getNumFlows() {
+        return numFlows;
     }
 
     public Node getTo() {

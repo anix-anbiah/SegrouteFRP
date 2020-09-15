@@ -21,6 +21,7 @@ public class Util {
     }
     
     public static double ratio(double num, double den) {
+        
         double ratio = num / den;
         ratio = ((int) (ratio * 100.0)) / 100.0;
         
