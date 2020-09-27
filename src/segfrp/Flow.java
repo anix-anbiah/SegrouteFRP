@@ -22,9 +22,14 @@ import org.jgrapht.graph.*;
  */
 public class Flow {
 
-    // the list of nodes that carry the flow
-    private List<Segment> segmentsSGP; // list of segments of the end-to-end path;
-    private GraphPath<Node, Link> pathSGP, backupPathSGP;
+    // Segment-Based Protection (SBP) member variables
+    private final List<Segment> segmentsSBP; // list of segments of the end-to-end path;
+    private final GraphPath<Node, Link> pathSBP, backupPathSBP;
+
+    // TI-LFA member variables
+    private final GraphPath<Node, Link> spath; // shortest path
+    private int tilfaOpstate;   // Op state for TI-LFA
+    private int tilfaOpPathlen; // path len of TI-LFA
 
     private Stack domainLabelStack; // label stack for domain partitioning based routing
     private Stack heuristicLabelStack; // label stack for heuristic method
@@ -49,7 +54,8 @@ public class Flow {
     boolean debug;
 
     public Flow(Network net, Node src, Node dst, int bitRate, int flowId,
-            GraphPath<Node, Link> path, GraphPath<Node, Link> backupPath) {
+            GraphPath<Node, Link> spath,
+            GraphPath<Node, Link> sbpPath, GraphPath<Node, Link> sbpBackupPath) {
 
         this.net = net;
         this.src = src;
@@ -60,10 +66,14 @@ public class Flow {
 
         this.crossedSEMetricThreshold = false;
 
-        this.pathSGP = path;
-        this.backupPathSGP = backupPath;
+        this.spath = spath; // shortest path
+        this.tilfaOpstate = Network.OPSTATE_UNKNOWN;
+        this.tilfaOpPathlen = 0;
 
-        this.segmentsSGP = new ArrayList<>();
+        this.pathSBP = sbpPath;  // SBP Primary
+        this.backupPathSBP = sbpBackupPath; // SBP Backup
+
+        this.segmentsSBP = new ArrayList<>();
 
 //        System.out.println("Creating flow with flow ID " + flowId + " with path length " + path.getVertexList().size() +
 //                " between nodes " + src.toString() + " and " + dst.toString());
@@ -74,7 +84,7 @@ public class Flow {
     }
 
     public GraphPath<Node, Link> getPath() {
-        return pathSGP;
+        return pathSBP;
     }
 
 //    // looks like this method is not used- can be removed with caution
@@ -86,7 +96,7 @@ public class Flow {
 //        this.coflowCountDone = coflowCountDone;
 //    }
     public List<Node> getNodeList() {
-        return pathSGP.getVertexList();
+        return pathSBP.getVertexList();
     }
 
     protected void setLabelStack(Stack stack, int method) {
@@ -148,10 +158,10 @@ public class Flow {
         FlowNode fnode;
 
         System.out.println(toString());
-        System.out.println("PATH :: " + pathSGP.getEdgeList().size() + " HOP(S) :: "
-                + pathSGP.toString());
-        System.out.println("BACKUP PATH :: " + backupPathSGP.getEdgeList().size()
-                + " HOP(S) :: " + backupPathSGP.toString());
+        System.out.println("PATH :: " + pathSBP.getEdgeList().size() + " HOP(S) :: "
+                + pathSBP.toString());
+        System.out.println("BACKUP PATH :: " + backupPathSBP.getEdgeList().size()
+                + " HOP(S) :: " + backupPathSBP.toString());
 
 //        System.out.print("FLOW NODES :: ");
 //        for (Node n : path.getVertexList()) {
@@ -308,86 +318,85 @@ public class Flow {
             return b.getNumFlows() - a.getNumFlows();
         }
     }
-    
+
     private List<Node> findSegmentEndPoints(int maxSLD) {
-        
+
         List<Node> segmentEndPoints = new ArrayList<>();
         int seCount = 0;
-        
-        Iterator primaryNodesItr = pathSGP.getVertexList().iterator();
-        List<Node> backupNodes = backupPathSGP.getVertexList();
-        
+
+        Iterator primaryNodesItr = pathSBP.getVertexList().iterator();
+        List<Node> backupNodes = backupPathSBP.getVertexList();
+
         // add the destination node as one of the segment end points by default
         segmentEndPoints.add(dst);
         seCount++;
-        
+
         Node nextNode;
-        while(primaryNodesItr.hasNext()) {
+        while (primaryNodesItr.hasNext()) {
             nextNode = (Node) primaryNodesItr.next();
-            
+
             // skip the source node
-            if(nextNode.equals(src)) {
+            if (nextNode.equals(src)) {
                 continue;
             }
-            
+
             // skip destination node as it has already been added
             // and exit since we've already reached the destination
-            if(nextNode.equals(dst)) {
+            if (nextNode.equals(dst)) {
                 break;
             }
-            
-            if(backupNodes.contains(nextNode)) {
+
+            if (backupNodes.contains(nextNode)) {
                 segmentEndPoints.add(nextNode);
                 seCount++;
             }
         }
-        
-        if(seCount <= maxSLD) {
+
+        if (seCount <= maxSLD) {
             return segmentEndPoints;
         }
-        
+
         // sort the segment endpoints based on the number
         // of flows routed through them (in decreasing order)
         Collections.sort(segmentEndPoints, new NodeComparator());
-        
+
         seCount = 0;
-        
+
         // now pick the top maxSLD segment endpoints
         List<Node> finalSegmentEndPoints = new ArrayList<>();
-        
+
         // add the destination node by default
-        finalSegmentEndPoints.add(dst); 
+        finalSegmentEndPoints.add(dst);
         seCount++;
-        
+
         Iterator seItr = segmentEndPoints.iterator();
-        while(seItr.hasNext() & (seCount < maxSLD)) {
+        while (seItr.hasNext() & (seCount < maxSLD)) {
             nextNode = (Node) seItr.next();
-            if(dst.equals(nextNode)) {
+            if (dst.equals(nextNode)) {
                 continue;
             }
-            
+
             finalSegmentEndPoints.add(nextNode);
             seCount++;
         }
-        
+
         return finalSegmentEndPoints;
-        
+
     }
-    
+
     // Take the primary and backup paths of the flow and divide them into
     // protected segments for SGP (Segment-Based Protection)
-    protected void segmentizeSGP(int maxSLD) {
-        
+    protected void segmentizeForSBP(int maxSLD) {
+
         List<Node> sePoints = findSegmentEndPoints(maxSLD);
-        
 
 //        System.out.println("Segmentizing Flow " + flowId);
 //        prettyPrint();
-        List<Node> primaryNodes = pathSGP.getVertexList();
-        List<Link> primaryEdges = pathSGP.getEdgeList();
+        List<Node> primaryNodes = pathSBP.getVertexList();
+        List<Link> primaryEdges = pathSBP.getEdgeList();
 
-        List<Node> backupNodes = backupPathSGP.getVertexList();
-        List<Link> backupEdges = backupPathSGP.getEdgeList();
+        List<Node> backupNodes = backupPathSBP.getVertexList();
+        List<Link> backupEdges = backupPathSBP.getEdgeList();
 
         Iterator nodeItr = primaryNodes.iterator();
         Iterator backupNodeItr = backupNodes.iterator();
@@ -435,7 +444,7 @@ public class Flow {
                 }
 
                 // add this segment to the list of segments for this flow
-                segmentsSGP.add(newSegment);
+                segmentsSBP.add(newSegment);
 
                 // add the edges and nodes from back path
                 Node nextBackupNode;
@@ -482,30 +491,43 @@ public class Flow {
 
     }
 
-    public int getPrimaryPathLength() {
+    public int getSbpPrimaryPathLength() {
         int plen = 0;
 
-        for (Segment seg : segmentsSGP) {
+        for (Segment seg : segmentsSBP) {
             plen += seg.getPrimary().getEdgeList().size();
         }
 
         return plen;
     }
+    
+    public int getTilfaPrimaryPathLength() {
+        return spath.getLength();
+    }
+    
+    public int getTilfaOpPathLength() {
+        if(tilfaOpstate == Network.OPSTATE_UNKNOWN) {
+            Network.warning("getTilfaOpPathLength: state is UNKNOWN");
+            return -1;
+        }
+        
+        return tilfaOpPathlen;
+    }
 
-    public int getBackupPathLength() {
+    public int getSbpBackupPathLength() {
         int plen = 0;
 
-        for (Segment seg : segmentsSGP) {
+        for (Segment seg : segmentsSBP) {
             plen += seg.getBackup().getEdgeList().size();
         }
 
         return plen;
     }
 
-    public int getOpPathLength() {
+    public int getSbpOpPathLength() {
         int plen = 0;
 
-        for (Segment seg : segmentsSGP) {
+        for (Segment seg : segmentsSBP) {
             if (seg.getOpstate() == Network.OPSTATE_UP) {
                 plen += seg.getPrimary().getEdgeList().size();
             } else {
@@ -516,10 +538,10 @@ public class Flow {
         return plen;
     }
 
-    public int getOpstate() {
+    public int getSbpOpstate() {
         int opstate = Network.OPSTATE_UP;
 
-        for (Segment seg : segmentsSGP) {
+        for (Segment seg : segmentsSBP) {
             if (seg.getOpstate() == Network.OPSTATE_DOWN) {
                 // if any of the segments are down, then the flow's opstate is down
                 return Network.OPSTATE_DOWN;
@@ -532,4 +554,140 @@ public class Flow {
 
         return opstate;
     }
+
+    // Get the operationl state for TI-LFA
+    public int getTilfaOpstate() {
+
+        int spLen = 0;
+        List<Link> failedLinks = new ArrayList<>();
+
+        // check if any link along the shortest path of the flow is down
+        for (Link lnk : spath.getEdgeList()) {
+            if (lnk.getOpstate() == Network.OPSTATE_DOWN) {
+                spLen = tilfaOpPathlen;
+                tilfaOpstate = findTilfaRouteState(lnk.getSource(), lnk, failedLinks);
+//                System.out.println("getTilfaOpstate. Flow Id " + getFlowId()
+//                        + ". Op Path Len = " + tilfaOpPathlen
+//                        + ". Shortest Path len = " + spath.getEdgeList().size() 
+//                        + ". Initial unfailed path segment = " + spLen
+//                        + ". Num of failed links = " + (failedLinks.size()+1)
+//                        + ". Op state = " + ((tilfaOpstate == Network.OPSTATE_UP) ? "UP" : "DOWN"));
+                
+                return tilfaOpstate;
+            }
+
+            tilfaOpPathlen++;
+        }
+
+        tilfaOpstate = Network.OPSTATE_UP;
+        
+        return tilfaOpstate;
+
+//            if (lnk.getOpstate() == Network.OPSTATE_DOWN) {
+//                // now check if the Shortest path from link source
+//                // to the flow destination has any downed links
+////                System.out.println("TILFA Op state for Flow " + getFlowId());
+////                System.out.println("Link " + lnk.toString() + " is down");
+////                System.out.println((getSbpOpstate() == Network.OPSTATE_DOWN)
+////                        ? "SBP Op state is DOWN " : "SBP Op state is UP ");
+//
+//                if (getSbpOpstate() == Network.OPSTATE_DOWN) {
+////                    System.out.println("SBP Primary " + pathSBP.toString());
+////                    System.out.println("SBP Backup  " + backupPathSBP.toString());
+//                }
+//
+//                // Remove the downed link from the network before
+//                // computing the repair path
+//                net.graph.setEdgeWeight(lnk, 100000);
+//
+//                rPath = net.getShortestPath(lnk.getSource(), dst);
+//
+//                net.graph.setEdgeWeight(lnk, Graph.DEFAULT_EDGE_WEIGHT);
+//
+////                System.out.println("Found repair path " + rPath.toString());
+//                for (Link rlnk : rPath.getEdgeList()) {
+//
+//                    if (rlnk.getOpstate() == Network.OPSTATE_DOWN) {
+////                        System.out.println("Repair path has a link down " + rlnk.toString());
+//
+//                        // the repair path also has a link down
+//                        // check the if the repair path from this
+//                        // down link uses the original downed link.
+//                        // If so, this flow will be dropped.
+//                        net.graph.setEdgeWeight(rlnk, 100000);
+//
+//                        rrPath = net.getShortestPath(rlnk.getSource(), dst);
+//
+//                        net.graph.setEdgeWeight(rlnk, Graph.DEFAULT_EDGE_WEIGHT);
+//
+////                        System.out.println("Re-repair path is " + rrPath.toString());
+//                        for (Link rrlnk : rrPath.getEdgeList()) {
+//                            if (rrlnk.equals(lnk)) {
+////                                System.out.println("Re-repair path has original down link");
+//
+//                                return Network.OPSTATE_DOWN;
+//
+//                            }
+//
+//                            // This is probably not right. This needs to be recursive
+//                            if (rrlnk.getOpstate() == Network.OPSTATE_DOWN) {
+////                                System.out.println("Re-repair path has link down");
+//
+//                                return Network.OPSTATE_DOWN;
+//                            }
+//                        }
+//
+////                        System.out.println("Re-repair path is operational");
+//                        // must not continue along repair path
+//                        return Network.OPSTATE_UP;
+//                    }
+//                }
+//
+////                System.out.println("Repair path is operational");
+//                return Network.OPSTATE_UP;
+//
+//            }
+//        }
+    }
+
+    // Find if there is a route to destination from a local point of repair
+    // to the destination. The local link that has failed and the list of
+    // previously known failedlinks are also given
+    private int findTilfaRouteState(Node lpr, Link localFailedLink, List<Link> failedLinks) {
+
+//        System.out.println("findTilfaRouteState: Flow Id " + getFlowId()
+//                + " from " + src + " to " + dst
+//                + " LPR = " + lpr.toString() + ". Failed link = " + localFailedLink.toString()
+//                + " Num failed links = " + failedLinks.size());
+
+        // first find the shortest path from LPR (local point of repair)
+        // to the destination, but exclude the local failed link
+        net.graph.setEdgeWeight(localFailedLink, 100000);
+
+        GraphPath<Node, Link> route = net.getShortestPath(lpr, dst);
+
+//        System.out.println("Repair path = " + route.toString());
+
+        net.graph.setEdgeWeight(localFailedLink, Graph.DEFAULT_EDGE_WEIGHT);
+
+        for (Link lnk : route.getEdgeList()) {
+
+            if (failedLinks.contains(lnk)) {
+                return Network.OPSTATE_DOWN;
+            }
+
+            if (lnk.getOpstate() == Network.OPSTATE_DOWN) {
+                failedLinks.add(localFailedLink);
+
+                return findTilfaRouteState(lnk.getSource(), lnk, failedLinks);
+            }
+
+            tilfaOpPathlen++;
+        }
+
+        // there are now downed links along the path
+        return Network.OPSTATE_UP;
+
+    }
+
 }
