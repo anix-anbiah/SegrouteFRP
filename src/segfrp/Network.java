@@ -632,7 +632,13 @@ public class Network {
                 + " :: PercentageDropped " + percentageDroppedFlowsTILFA
                 + " :: AvgOpPrimaryPathLen " + avgOpPrimaryPathLenTILFA
                 + " :: AvgOpPathLen " + avgOpPathLenTILFA
-                + " :: PercentageOpIncrease " + percentageOpPathLenIncreaseTILFA);
+                + " :: PercentageOpIncrease " + percentageOpPathLenIncreaseTILFA
+                + " :: TIMFA "
+                + " :: Dropped " + numDroppedFlowsTIMFA
+                + " :: PercentageDropped " + percentageDroppedFlowsTIMFA
+                + " :: AvgOpPrimaryPathLen " + avgOpPrimaryPathLenTIMFA
+                + " :: AvgOpPathLen " + avgOpPathLenTIMFA
+                + " :: PercentageOpIncrease " + percentageOpPathLenIncreaseTIMFA);
 
 //        dumpln("# Max FTS = " + maxDomainFwdTableSize
 //                + " (Domain) :: " + maxHeuristicFwdTableSize + " (Heuristic); Avg "
@@ -953,7 +959,6 @@ public class Network {
         }
 
 //        System.out.println("Failing random link " + lnk.toString()
-//                + " index = " + index
 //                + " with "
 //                + lnk.getNumFlows() + " flows");
         setLinkOpstate(lnk, Network.OPSTATE_DOWN);
@@ -1290,12 +1295,15 @@ public class Network {
     private int numDroppedFlowsSBP;
     private double percentageDroppedFlowsSBP;
 
-    // Dropped stats for TI-FLA
+    // Dropped stats for TI-LFA
     private int numDroppedFlowsTILFA;
     private double percentageDroppedFlowsTILFA;
 
+    // Dropped stats for TI-MFA
+    private int numDroppedFlowsTIMFA;
+    private double percentageDroppedFlowsTIMFA;
+
     private int numBackupFlowsSBP;
-    private int numBackupFlowsTILFA;
     private double percentageBackupFlowsSBP;
 
     private int cumulPrimaryPathLenSBP;
@@ -1303,9 +1311,11 @@ public class Network {
 
     private int cumulOpPrimaryPathLenSBP;
     private int cumulOpPrimaryPathLenTILFA;
+    private int cumulOpPrimaryPathLenTIMFA;
 
     private int cumulOpPathLenSBP;
     private int cumulOpPathLenTILFA;
+    private int cumulOpPathLenTIMFA;
 
     private double avgPrimaryPathLenSBP;
     private double avgBackupPathLenSBP;
@@ -1320,15 +1330,19 @@ public class Network {
     private double avgOpPathLenTILFA;
     private double percentageOpPathLenIncreaseTILFA;
 
+    private double avgOpPrimaryPathLenTIMFA;
+    private double avgOpPathLenTIMFA;
+    private double percentageOpPathLenIncreaseTIMFA;
+
     // dump the operational stats for the flows
     public void updateFlowOpstats() {
 
         int numFlows = flows.size();
         numDroppedFlowsSBP = 0; // number of flows with SBP operational state DOWN
         numDroppedFlowsTILFA = 0; // same for TI-LFA
+        numDroppedFlowsTIMFA = 0; // same for TI-MFA
 
         numBackupFlowsSBP = 0; // number of flows in BACKUP state
-        numBackupFlowsTILFA = 0;
 
         cumulPrimaryPathLenSBP = 0; // cumulative primary path length
         cumulBackupPathLenSBP = 0;
@@ -1339,7 +1353,10 @@ public class Network {
         cumulOpPrimaryPathLenTILFA = 0;
         cumulOpPathLenTILFA = 0;
 
-        int sbpOpstate, tilfaOpstate;
+        cumulOpPrimaryPathLenTIMFA = 0;
+        cumulOpPathLenTIMFA = 0;
+
+        int sbpOpstate, tilfaOpstate, timfaOpstate;
 
         for (Flow flow : flows.values()) {
 
@@ -1347,7 +1364,8 @@ public class Network {
             cumulBackupPathLenSBP += flow.getSbpBackupPathLength();
 
             sbpOpstate = flow.getSbpOpstate();
-            tilfaOpstate = flow.getTilfaOpstate();
+            tilfaOpstate = flow.getTilfaOpstate(false);
+            timfaOpstate = flow.getTilfaOpstate(true);
 
             if (sbpOpstate == Network.OPSTATE_DOWN) {
                 numDroppedFlowsSBP++;
@@ -1369,6 +1387,12 @@ public class Network {
                 cumulOpPathLenTILFA += flow.getTilfaOpPathLength();
             }
 
+            if (timfaOpstate == Network.OPSTATE_DOWN) {
+                numDroppedFlowsTIMFA++;
+            } else {
+                cumulOpPrimaryPathLenTIMFA += flow.getTimfaPrimaryPathLength();
+                cumulOpPathLenTIMFA += flow.getTimfaOpPathLength();
+            }
 //            if ((sbpOpstate == Network.OPSTATE_DOWN)
 //                    && (tilfaOpstate == Network.OPSTATE_UP)) {
 //                System.out.println("SBP is DOWN, but TI-LFA is UP");
@@ -1376,7 +1400,9 @@ public class Network {
 //
 //            if (((sbpOpstate == Network.OPSTATE_UP) || (sbpOpstate == Network.OPSTATE_BACKUP))
 //                    && (tilfaOpstate == Network.OPSTATE_DOWN)) {
-//                System.out.println("SBP is OPERATIONAL, but TI-LFA is DOWN");
+//                System.out.println("SBP is OPERATIONAL, but TI-LFA is DOWN for flow " + flow.getFlowId()); 
+//                
+//                flow.prettyPrint();
 //            }
         }
 
@@ -1395,12 +1421,16 @@ public class Network {
         percentageBackupFlowsSBP = Util.percentage(numBackupFlowsSBP, flows.size() - numDroppedFlowsSBP);
         percentageDroppedFlowsSBP = Util.percentage(numDroppedFlowsSBP, flows.size());
         percentageDroppedFlowsTILFA = Util.percentage(numDroppedFlowsTILFA, flows.size());
+        percentageDroppedFlowsTIMFA = Util.percentage(numDroppedFlowsTIMFA, flows.size());
 
         System.out.println("Number of dropped flows SBP " + numDroppedFlowsSBP + " ("
                 + percentageDroppedFlowsSBP + "%)");
 
         System.out.println("Number of dropped flows TILFA " + numDroppedFlowsTILFA + " ("
                 + percentageDroppedFlowsTILFA + "%)");
+
+        System.out.println("Number of dropped flows TIMFA " + numDroppedFlowsTIMFA + " ("
+                + percentageDroppedFlowsTIMFA + "%)");
 
         System.out.println("Total number of segments = " + segments.size());
 
@@ -1416,9 +1446,13 @@ public class Network {
         avgOpPrimaryPathLenTILFA = Util.ratio(cumulOpPrimaryPathLenTILFA, flows.size() - numDroppedFlowsTILFA);
         avgOpPathLenTILFA = Util.ratio(cumulOpPathLenTILFA, flows.size() - numDroppedFlowsTILFA);
 
+        avgOpPrimaryPathLenTIMFA = Util.ratio(cumulOpPrimaryPathLenTIMFA, flows.size() - numDroppedFlowsTIMFA);
+        avgOpPathLenTIMFA = Util.ratio(cumulOpPathLenTIMFA, flows.size() - numDroppedFlowsTIMFA);
+
         percentagePathLenIncreaseSBP = Util.percentage(cumulBackupPathLenSBP - cumulPrimaryPathLenSBP, cumulPrimaryPathLenSBP);
         percentageOpPathLenIncreaseSBP = Util.percentage(cumulOpPathLenSBP - cumulOpPrimaryPathLenSBP, cumulOpPrimaryPathLenSBP);
         percentageOpPathLenIncreaseTILFA = Util.percentage(cumulOpPathLenTILFA - cumulOpPrimaryPathLenTILFA, cumulOpPrimaryPathLenTILFA);
+        percentageOpPathLenIncreaseTIMFA = Util.percentage(cumulOpPathLenTIMFA - cumulOpPrimaryPathLenTIMFA, cumulOpPrimaryPathLenTIMFA);
 
         System.out.println("============ SBP Provisioned =================");
         System.out.println("Average primary path length = " + avgPrimaryPathLenSBP);
@@ -1437,11 +1471,17 @@ public class Network {
         System.out.println("Percentage Op increase = "
                 + percentageOpPathLenIncreaseSBP + "%");
 
-        System.out.println("============ TILFA Operationa ================");
+        System.out.println("\n============ TILFA Operational ================");
         System.out.println("Average Op primary path length = " + avgOpPrimaryPathLenTILFA);
         System.out.println("Average Op path length = " + avgOpPathLenTILFA);
         System.out.println("Percentage Op increase = "
                 + percentageOpPathLenIncreaseTILFA + "%");
+
+        System.out.println("\n============ TIMFA Operational ================");
+        System.out.println("Average Op primary path length = " + avgOpPrimaryPathLenTIMFA);
+        System.out.println("Average Op path length = " + avgOpPathLenTIMFA);
+        System.out.println("Percentage Op increase = "
+                + percentageOpPathLenIncreaseTIMFA + "%");
 
     }
 

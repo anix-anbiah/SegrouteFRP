@@ -31,6 +31,10 @@ public class Flow {
     private int tilfaOpstate;   // Op state for TI-LFA
     private int tilfaOpPathlen; // path len of TI-LFA
 
+    // TI-MFA member variables
+    private int timfaOpstate;   // Op state for TI-MFA
+    private int timfaOpPathlen; // path len of TI-MFA
+
     private Stack domainLabelStack; // label stack for domain partitioning based routing
     private Stack heuristicLabelStack; // label stack for heuristic method
 
@@ -69,6 +73,9 @@ public class Flow {
         this.spath = spath; // shortest path
         this.tilfaOpstate = Network.OPSTATE_UNKNOWN;
         this.tilfaOpPathlen = 0;
+
+        this.timfaOpstate = Network.OPSTATE_UNKNOWN;
+        this.timfaOpPathlen = 0;
 
         this.pathSBP = sbpPath;  // SBP Primary
         this.backupPathSBP = sbpBackupPath; // SBP Backup
@@ -158,10 +165,13 @@ public class Flow {
         FlowNode fnode;
 
         System.out.println(toString());
-        System.out.println("PATH :: " + pathSBP.getEdgeList().size() + " HOP(S) :: "
+        System.out.println("SBP PRIMARY PATH :: " + pathSBP.getEdgeList().size() + " HOP(S) :: "
                 + pathSBP.toString());
-        System.out.println("BACKUP PATH :: " + backupPathSBP.getEdgeList().size()
+        System.out.println("SBP BACKUP PATH :: " + backupPathSBP.getEdgeList().size()
                 + " HOP(S) :: " + backupPathSBP.toString());
+
+        System.out.println("SHORTEST PATH :: " + spath.getLength() + " HOP(S) :: "
+                + spath.toString());
 
 //        System.out.print("FLOW NODES :: ");
 //        for (Node n : path.getVertexList()) {
@@ -500,18 +510,31 @@ public class Flow {
 
         return plen;
     }
-    
+
     public int getTilfaPrimaryPathLength() {
         return spath.getLength();
     }
-    
+
+    public int getTimfaPrimaryPathLength() {
+        return spath.getLength();
+    }
+
     public int getTilfaOpPathLength() {
-        if(tilfaOpstate == Network.OPSTATE_UNKNOWN) {
+        if (tilfaOpstate == Network.OPSTATE_UNKNOWN) {
             Network.warning("getTilfaOpPathLength: state is UNKNOWN");
             return -1;
         }
-        
+
         return tilfaOpPathlen;
+    }
+
+    public int getTimfaOpPathLength() {
+        if (timfaOpstate == Network.OPSTATE_UNKNOWN) {
+            Network.warning("getTimfaOpPathLength: state is UNKNOWN");
+            return -1;
+        }
+
+        return timfaOpPathlen;
     }
 
     public int getSbpBackupPathLength() {
@@ -556,32 +579,54 @@ public class Flow {
     }
 
     // Get the operationl state for TI-LFA
-    public int getTilfaOpstate() {
+    public int getTilfaOpstate(boolean timfa) {
 
         int spLen = 0;
         List<Link> failedLinks = new ArrayList<>();
+        int opstate;
 
         // check if any link along the shortest path of the flow is down
         for (Link lnk : spath.getEdgeList()) {
             if (lnk.getOpstate() == Network.OPSTATE_DOWN) {
-                spLen = tilfaOpPathlen;
-                tilfaOpstate = findTilfaRouteState(lnk.getSource(), lnk, failedLinks);
+//                spLen = tilfaOpPathlen;
+
+                opstate = findTilfaRouteState(lnk.getSource(), lnk, failedLinks, timfa);
+
 //                System.out.println("getTilfaOpstate. Flow Id " + getFlowId()
 //                        + ". Op Path Len = " + tilfaOpPathlen
 //                        + ". Shortest Path len = " + spath.getEdgeList().size() 
 //                        + ". Initial unfailed path segment = " + spLen
-//                        + ". Num of failed links = " + (failedLinks.size()+1)
+//                        + ". Num of failed links = " + failedLinks.size()
 //                        + ". Op state = " + ((tilfaOpstate == Network.OPSTATE_UP) ? "UP" : "DOWN"));
-                
-                return tilfaOpstate;
+                if (timfa) {
+                    // restore all the failed links in the graph
+                    for (Link flnk : failedLinks) {
+                        net.graph.setEdgeWeight(flnk, Graph.DEFAULT_EDGE_WEIGHT);
+                    }
+
+                    timfaOpstate = opstate;
+                } else {
+
+                    tilfaOpstate = opstate;
+                }
+
+                return opstate;
             }
 
-            tilfaOpPathlen++;
+            if (timfa) {
+                timfaOpPathlen++;
+            } else {
+                tilfaOpPathlen++;
+            }
         }
 
-        tilfaOpstate = Network.OPSTATE_UP;
-        
-        return tilfaOpstate;
+        if (timfa) {
+            timfaOpstate = Network.OPSTATE_UP;
+        } else {
+            tilfaOpstate = Network.OPSTATE_UP;
+        }
+
+        return Network.OPSTATE_UP;
 
 //            if (lnk.getOpstate() == Network.OPSTATE_DOWN) {
 //                // now check if the Shortest path from link source
@@ -653,22 +698,28 @@ public class Flow {
     // Find if there is a route to destination from a local point of repair
     // to the destination. The local link that has failed and the list of
     // previously known failedlinks are also given
-    private int findTilfaRouteState(Node lpr, Link localFailedLink, List<Link> failedLinks) {
+    private int findTilfaRouteState(Node lpr, Link localFailedLink, List<Link> failedLinks, boolean timfa) {
 
 //        System.out.println("findTilfaRouteState: Flow Id " + getFlowId()
 //                + " from " + src + " to " + dst
 //                + " LPR = " + lpr.toString() + ". Failed link = " + localFailedLink.toString()
 //                + " Num failed links = " + failedLinks.size());
-
         // first find the shortest path from LPR (local point of repair)
         // to the destination, but exclude the local failed link
         net.graph.setEdgeWeight(localFailedLink, 100000);
 
+        failedLinks.add(localFailedLink);
+
         GraphPath<Node, Link> route = net.getShortestPath(lpr, dst);
 
 //        System.out.println("Repair path = " + route.toString());
-
-        net.graph.setEdgeWeight(localFailedLink, Graph.DEFAULT_EDGE_WEIGHT);
+        // If it is TI-LFA, then LPR only uses the local failed link to
+        // find the repair path. For TI-MFA, all upstream failures are
+        // taken into account. So, don't restore the failed link just yet.
+        // Failed links will be restored later when repair path is fully computed.
+        if (!timfa) {
+            net.graph.setEdgeWeight(localFailedLink, Graph.DEFAULT_EDGE_WEIGHT);
+        }
 
         for (Link lnk : route.getEdgeList()) {
 
@@ -677,12 +728,15 @@ public class Flow {
             }
 
             if (lnk.getOpstate() == Network.OPSTATE_DOWN) {
-                failedLinks.add(localFailedLink);
 
-                return findTilfaRouteState(lnk.getSource(), lnk, failedLinks);
+                return findTilfaRouteState(lnk.getSource(), lnk, failedLinks, timfa);
             }
 
-            tilfaOpPathlen++;
+            if (timfa) {
+                timfaOpPathlen++;
+            } else {
+                tilfaOpPathlen++;
+            }
         }
 
         // there are now downed links along the path
