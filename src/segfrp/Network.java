@@ -630,7 +630,7 @@ public class Network {
         // dump Flow Op stats
         dumpln("# OPSTAT Numflows " + numFlows + " :: NumFailures " + numfails
                 + " :: MaxSLD " + maxSLD
-                + " :: SBP "
+                + " :: SBP_1 "
                 + " :: Dropped " + numDroppedFlowsSBP_1
                 + " :: PercentageDropped " + percentageDroppedFlowsSBP_1
                 + " :: Backup " + numBackupFlowsSBP_1
@@ -643,6 +643,12 @@ public class Network {
                 + " :: AvgOpPrimaryPathLen " + avgOpPrimaryPathLenSBP_1
                 + " :: AvgOpPathLen " + avgOpPathLenSBP_1
                 + " :: PercentOpIncrease " + percentageOpPathLenIncreaseSBP_1
+                + " :: SBP_3 "
+                + " :: PercetageDropped " + percentageDroppedFlowsSBP_3
+                + " :: PercentageOpIncrease " + percentageOpPathLenIncreaseSBP_3
+                + " :: SBP_5 "
+                + " :: PercetageDropped " + percentageDroppedFlowsSBP_5
+                + " :: PercentageOpIncrease " + percentageOpPathLenIncreaseSBP_5                
                 + " :: TILFA "
                 + " :: Dropped " + numDroppedFlowsTILFA
                 + " :: PercentageDropped " + percentageDroppedFlowsTILFA
