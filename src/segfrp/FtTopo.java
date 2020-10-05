@@ -39,8 +39,8 @@ public class FtTopo {
 
         createFtTopology(k, h, p);
 
-        System.out.println("Number of entities in Sim_system = "
-                + Sim_system.get_num_entities());
+//        System.out.println("Number of entities in Sim_system = "
+//                + Sim_system.get_num_entities());
 
         System.out.println("Added " + net.nodes.size() + " nodes and "
                 + net.graph.edgeSet().size() + " links ");
@@ -49,9 +49,9 @@ public class FtTopo {
 
     private class FtNode {
 
-        Node  node;
+        Node node;
         FtPod pod; // the pod in which this node is present
-        int   srDomainId;
+        int srDomainId;
 
         public FtNode(Node node, FtPod pod, int srDomainId) {
             this.node = node;
@@ -66,7 +66,7 @@ public class FtTopo {
         public FtPod getPod() {
             return pod;
         }
-        
+
         public int getSrDomainId() {
             return srDomainId;
         }
@@ -208,13 +208,12 @@ public class FtTopo {
 //        }
 //
 //    }
-
     private class FtPod { // a pod in a fat tree topology
 
         private final int k; // part of a k-ary fat tree
         private final int h;
         FtPod parent;
-        
+
         List<FtNode> switches;
         List<FtPod> children;
 
@@ -249,8 +248,8 @@ public class FtTopo {
                 // podNum is also the switchId of the parent in case
                 // of non-root pods, else it is zero
                 //System.out.println("SR Domain ID for switch " + switchId + " is " + srDomainId);
-                
-                swtch = ftCreateNodeWithId(switchId, ((h == 1) ? Node.Type.TOR : Node.Type.AGGR), 
+
+                swtch = ftCreateNodeWithId(switchId, ((h == 1) ? Node.Type.TOR : Node.Type.AGGR),
                         srDomainId, this);
                 switches.add(swtch);
                 ftNodes.put(switchId, swtch);
@@ -271,7 +270,7 @@ public class FtTopo {
             }
         }
 
-        private int computeSrDomainId(int switchId, int podNum, int podSize, 
+        private int computeSrDomainId(int switchId, int podNum, int podSize,
                 int parentSwitchId) {
 
 //            int srDomainId;
@@ -326,7 +325,6 @@ public class FtTopo {
 //                    }
 //                }
 //            }
-
             return 0; // default - domain partitioning is not meaningful for FT topo
         }
 
@@ -428,9 +426,10 @@ public class FtTopo {
 
         FtNode dstNode = getRandomFtNode(srcNode, isRootPodAllowed);
 
-        GraphPath path = route(srcNode, dstNode);
-
-        net.createFlowBetweenNodes(srcNode.getNode(), dstNode.getNode(), bitRate, path);
+        // FRSR - Temporarily disabling custom PC and using
+        // JGrapht's PC algorithms
+        // GraphPath path = route(srcNode, dstNode);
+        net.createFlowBetweenNodes(srcNode.getNode(), dstNode.getNode(), bitRate, null);
 
     }
 
@@ -445,12 +444,14 @@ public class FtTopo {
 
         pod = new FtPod(k, h, 0, p);
 
+        System.out.println("Create FT Topo - Creating DSP");
         net.createDsp();
-        // net.createKsp();
-
-        System.out.println("Number of entities in Sim_system = "
-                + Sim_system.get_num_entities());
-
+        System.out.println("Create FT Topo - Creating KSP");
+        net.createKsp();
+        System.out.println("Done creating DSP & KSP");
+        
+//        System.out.println("Number of entities in Sim_system = "
+//                + Sim_system.get_num_entities());
         numLinks = 0;
 
         pod.addEdges();
@@ -462,7 +463,6 @@ public class FtTopo {
         int flowCount = 0;
 
         // System.out.println("Adding " + numFlows + " INITIAL flows");
-
         for (int flowNum = 0; flowNum < numFlows; flowNum++) {
 
             ftCreateFlowBetweenRandomNodes(segfrp.NetworkTest.DEFAULT_FLOW_RATE);

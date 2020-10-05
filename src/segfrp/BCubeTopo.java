@@ -289,9 +289,11 @@ public class BCubeTopo {
         Network.info("Creating flow between " + src.node.toString() + " and "
                 + dst.node.toString());
 
-        GraphPath path = route(src, dst);
+        // GraphPath path = route(src, dst);
         
-        net.createFlowBetweenNodes(src.getNode(), dst.getNode(), bitRate, path);
+        // FRSR - Use JGraphT path computation algorithm
+        
+        net.createFlowBetweenNodes(src.getNode(), dst.getNode(), bitRate, null);
 
     }
 

@@ -420,7 +420,7 @@ public class Flow {
         List<Node> segBackupNodes = new ArrayList<>();
         List<Link> segBackupEdges = new ArrayList<>();
 
-        Segment newSegment;
+        Segment nextSegment;
         GraphPath<Node, Link> newPrimary;
         GraphPath<Node, Link> newBackup;
 
@@ -442,19 +442,22 @@ public class Flow {
 
                 newPrimary = new NetGraphPath(segNodes, segEdges);
 
+                boolean newSegment = false;
+
                 // see if this segment already exists in the network
-                newSegment = net.findSegment(Segment.SEGTYPE_PROTECTED, newPrimary);
+                nextSegment = net.findSegment(Segment.SEGTYPE_PROTECTED, newPrimary);
 
                 // if not, create it
-                if (newSegment == null) {
+                if (nextSegment == null) {
                     // System.out.println("Creating a new segment");
-                    newSegment = net.createSegment(Segment.SEGTYPE_PROTECTED, newPrimary);
+                    nextSegment = net.createSegment(Segment.SEGTYPE_PROTECTED, newPrimary);
+                    newSegment = true;
                 } else {
 //                    System.out.println("Found existing segment " + newSegment.getId());
                 }
 
                 // add this segment to the list of segments for this flow
-                segmentsSBP.add(newSegment);
+                segmentsSBP.add(nextSegment);
 
                 // add the edges and nodes from back path
                 Node nextBackupNode;
@@ -465,8 +468,19 @@ public class Flow {
                     if (nextBackupNode.equals(nextNode)) {
                         // back up path is complete- we have reached
                         // segment end point
-                        newBackup = new NetGraphPath(segBackupNodes, segBackupEdges);
-                        newSegment.setBackup(newBackup);
+                        // if this is a new segment, add the backup paths
+                        if (newSegment) {
+                            newBackup = new NetGraphPath(segBackupNodes, segBackupEdges);
+                            nextSegment.addInitialBackup(newBackup);
+
+                            for (int i = 0; i < (Network.SBP_MAX_BACKUPS - 1); i++) {
+//                                System.out.println("SegmentizeSBP: Adding backup #" +
+//                                        (i+2) + " for flow " + toString());
+                                nextSegment.addBackup();
+                            }
+
+                            // TBD We may need to sort backups based on path length
+                        }
 
                         // newSegment.prettyPrint();
                         break;
@@ -547,29 +561,32 @@ public class Flow {
         return plen;
     }
 
+    // SBP Op Path length of the flow is the sum of op path lengths of the segments
     public int getSbpOpPathLength() {
         int plen = 0;
 
         for (Segment seg : segmentsSBP) {
-            if (seg.getOpstate() == Network.OPSTATE_UP) {
-                plen += seg.getPrimary().getEdgeList().size();
-            } else {
-                plen += seg.getBackup().getEdgeList().size();
-            }
+            plen += seg.getOpPathLength();
         }
 
         return plen;
     }
 
-    public int getSbpOpstate() {
+    // get the operational state of this flow, subject to 
+    // the allowed max backup for each segment
+    public int getSbpOpstate(int maxBackup) {
         int opstate = Network.OPSTATE_UP;
+        
+        int segOpstate;
 
         for (Segment seg : segmentsSBP) {
-            if (seg.getOpstate() == Network.OPSTATE_DOWN) {
+            segOpstate = seg.getOpstate(maxBackup);
+            
+            if (segOpstate == Network.OPSTATE_DOWN) {
                 // if any of the segments are down, then the flow's opstate is down
                 return Network.OPSTATE_DOWN;
             }
-            if (seg.getOpstate() == Network.OPSTATE_BACKUP) {
+            if (segOpstate == Network.OPSTATE_BACKUP) {
                 // if any of the segments are using backup, flow is in backup state
                 opstate = Network.OPSTATE_BACKUP;
             }
@@ -706,7 +723,7 @@ public class Flow {
 //                + " Num failed links = " + failedLinks.size());
         // first find the shortest path from LPR (local point of repair)
         // to the destination, but exclude the local failed link
-        net.graph.setEdgeWeight(localFailedLink, 100000);
+        net.graph.setEdgeWeight(localFailedLink, Network.EDGE_WEIGHT_MAX);
 
         failedLinks.add(localFailedLink);
 

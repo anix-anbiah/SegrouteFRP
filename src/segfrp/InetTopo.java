@@ -66,7 +66,8 @@ public class InetTopo {
 
         if (demandFile.exists()) {
             System.out.println("Reading flows from file " + demandFileName);
-            readFlowsFromFile = true;
+            // readFlowsFromFile = true;
+            readFlowsFromFile = false; // FRSR - temporarily disabling this option
             try {
                 demandReader = new FileReader(demandFileName);
                 demandBr = new BufferedReader(demandReader);
@@ -151,8 +152,7 @@ public class InetTopo {
             System.out.println("IO Exception while reading topo file");
         }
 
-        System.out.println("Created " + net.graph.edgeSet().size() + " links");
-
+//        System.out.println("Created " + net.graph.edgeSet().size() + " links");
     }
 
     private PrintWriter createDemandWriter() {
@@ -225,28 +225,45 @@ public class InetTopo {
         }
     }
 
-    private void createFlowBetweenRandomNodes(int flowRate) {
+    private Node findRandomValidEndNode(Node avoidNode) {
+        Node node = null;
+        int degree;
 
-        int srcNodeIx = (int) (Math.random() * (numNodes - 1));
-
-        int dstNodeIx = srcNodeIx;
-
-        while (dstNodeIx == srcNodeIx) {
-            dstNodeIx = (int) (Math.random() * (numNodes - 1));
+        while (node == null) {
+            int nodeIx = (int) (Math.random() * (numNodes - 1));
+            
+            node = net.getNodeList().get(nodeIx);
+            if(node.equals(avoidNode)) {
+                
+                // make sure that it is not the node to be avoided
+                continue;
+            }
+            
+            degree = net.graph.degreeOf(node);
+            // find a node with degree at least two.
+            if (degree < 2) {
+                node = null;
+            }
         }
+
+        return node;
+
+    }
+
+    private void createFlowBetweenRandomNodes(int flowRate) {
 
         Node srcNode, dstNode;
 
-        // System.out.println("Creating flow between node IDs " + srcNodeId + " and " + dstNodeId);
-        srcNode = net.getNodeList().get(srcNodeIx);
-        dstNode = net.getNodeList().get(dstNodeIx);
+        srcNode = findRandomValidEndNode(null);
+        dstNode = findRandomValidEndNode(srcNode);
 
         //System.out.println("Creating flow between " + srcNode.toString() + " and " + dstNode.toString());
         Flow flow = net.createFlowBetweenNodes(srcNode, dstNode, flowRate);
 
-        if (!readFlowsFromFile) {
-            demandWriter.println(srcNode.getNodeId() + " " + dstNode.getNodeId());
-        }
+        // FRSR - temporarily disabling for FRSR
+//        if (!readFlowsFromFile) {
+//            demandWriter.println(srcNode.getNodeId() + " " + dstNode.getNodeId());
+//        }
 
     }
 

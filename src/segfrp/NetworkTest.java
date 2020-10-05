@@ -96,6 +96,7 @@ public class NetworkTest {
         if ("ft".equals(topo)) {
 
             FtTopo ftTopo = new FtTopo(net, this, topoArg1, topoArg2, p, numFlows);
+
             return;
         } else if ("ror".equals(topo)) {
 
@@ -103,7 +104,7 @@ public class NetworkTest {
 
             // topo has been added- create the SPTs
             net.createDsp();
-            
+
             net.createKsp();
 
             rorTopo.createInitialFlows();
@@ -112,9 +113,12 @@ public class NetworkTest {
             InetTopo inetTopo = new InetTopo(net, this, topoArg1, topoArg2, p, numFlows);
 
             net.createDsp();
-            
-        //    net.createKsp();
-            
+
+            net.createKsp();
+
+            System.out.println("Inet Topo created with " + net.getNodes().values().size()
+                    + " nodes " + net.graph.edgeSet().size() + " links");
+
             inetTopo.createInitialFlows();
 
             System.out.println("Inet Topo tested with " + net.getNodes().values().size()
@@ -131,7 +135,15 @@ public class NetworkTest {
 
             BCubeTopo bcube = new BCubeTopo(net, topoArg1, topoArg2, numFlows);
 
+            System.out.println("Creating Dijkstra's SP");
+
             net.createDsp();
+
+            System.out.println("Creating Bhandari Disjoint Path");
+
+            net.createKsp();
+
+            System.out.println("Done creating SP algorithms");
 
             bcube.createInitialFlows();
 
