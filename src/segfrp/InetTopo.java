@@ -11,6 +11,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.FileReader;
 import java.io.PrintWriter;
+import java.util.Map;
+import org.jgrapht.io.Attribute;
+import org.jgrapht.io.EdgeProvider;
+import org.jgrapht.io.GraphImporter;
+import org.jgrapht.io.GraphMLImporter;
+import org.jgrapht.io.VertexProvider;
 
 /**
  *
@@ -29,18 +35,41 @@ public class InetTopo {
     int numFlows;
     Network net;
     NetworkTest netTest;
-    int numNodes;
-    int topoIndex; // index of the topology file to read
+//    int numNodes;
+//    int topoIndex; // index of the topology file to read
     boolean readFlowsFromFile;
+    
+    GraphImporter<Node, Link> importer;
+
+    private class NodeProvider implements VertexProvider<Node> {
+
+        @Override
+        public Node buildVertex(String id, Map<String,Attribute> attributes) {
+            Attribute nodeIdAttr = attributes.get("id");
+            int nodeId = Integer.parseInt(nodeIdAttr.getValue());
+//            System.out.println("InetTopo: creating node " + nodeId);
+            return net.createNodeWithId(nodeId, Node.Type.OTHER);
+        }
+
+    }
+    
+    private class LinkProvider implements EdgeProvider<Node,Link> {
+
+        @Override
+        public Link buildEdge(Node from, Node to, String label, Map<String,Attribute> attributes) {
+            return net.addEdge(from, to);
+        }
+
+    }
 
     // topoArg2 is node used
-    public InetTopo(Network net, NetworkTest netTest, int numNodes, int topoArg2, int p, int numFlows) {
+    public InetTopo(Network net, NetworkTest netTest, int p, int numFlows) {
 
         this.net = net;
         this.netTest = netTest;
         this.numFlows = numFlows;
-        this.numNodes = numNodes;
-        this.topoIndex = topoArg2;
+//        this.numNodes = numNodes;
+//        this.topoIndex = topoArg2;
         this.readFlowsFromFile = false;
 
         createInetTopology(p);
@@ -49,9 +78,8 @@ public class InetTopo {
 
     private void createInetTopology(int p) {
 
-        int nodeCount = 0, nodesRead = 0, numFileNodes;
-        int linkCount = 0;
-        String topoFileName = "IN/Topo/Topo-" + numNodes + "-" + topoIndex + ".dat";
+        String topoName = "Kdl";
+        String topoFileName = "IN/" + topoName + ".graphml";
 
         try {
             System.out.println("Reading Inet topology from " + topoFileName);
@@ -61,13 +89,12 @@ public class InetTopo {
             return;
         }
 
-        demandFileName = "IN/Flows/Flows" + "_" + numNodes + "N_" + numFlows + "F.dat";
+        demandFileName = "IN/Flows/Flows" + "_" + topoName + "_" + numFlows + "F.dat";
         File demandFile = new File(demandFileName);
 
         if (demandFile.exists()) {
             System.out.println("Reading flows from file " + demandFileName);
-            // readFlowsFromFile = true;
-            readFlowsFromFile = false; // FRSR - temporarily disabling this option
+            readFlowsFromFile = true;
             try {
                 demandReader = new FileReader(demandFileName);
                 demandBr = new BufferedReader(demandReader);
@@ -81,76 +108,80 @@ public class InetTopo {
             readFlowsFromFile = false;
             demandWriter = createDemandWriter();
         }
+        
+        importer = new GraphMLImporter<>(new NodeProvider(), new LinkProvider());
+        
+        importer.importGraph(net.graph, topoReader);
 
-        // Read the topology first
-        BufferedReader br = new BufferedReader(topoReader);  //creates a buffering character input stream  
-        String line;
-        String[] content, nodesLine;
-        int nodeId, x, y, n1, n2, weight;
-        Node swtch, node1, node2;
-
-        try {
-            // read off the first two lead lines
-            line = br.readLine();
-            line = br.readLine();
-
-            nodesLine = line.split("\\s+");
-            numFileNodes = Integer.parseInt(nodesLine[0]);
-
-            if (numFileNodes < numNodes) {
-                System.out.println("Topo file has less nodes that required nodes");
-                return;
-            }
-
-            // first parse the nodes
-            while (nodesRead < numFileNodes) {
-                line = br.readLine();
-                // System.out.println("Read line " + line + " from file");
-                content = line.split("\\s+");
-                nodeId = Integer.parseInt(content[0]) + 1; // avoid index 0
-                x = Integer.parseInt(content[1]);
-                y = Integer.parseInt(content[2]);
-
-                nodesRead++;
-
-                if (nodesRead > numNodes) {
-                    continue;
-                }
-
-                // System.out.println("Creating Node " + nodeId + " (x,y) = (" + x + ", " + y + ")");
-                // offset x and y coordinates by 50 so that they don't hug the borders of the frame
-                swtch = net.createNodeWithId(nodeId, Node.Type.OTHER, 0, x + 50, y + 50);
-                nodeCount++;
-            }
-
-            System.out.println("Created " + nodeCount + " nodes");
-
-            while ((line = br.readLine()) != null) {
-
-                // System.out.println("Read line " + line + " from file");
-                content = line.split("\\s+");
-
-                n1 = Integer.parseInt(content[0]) + 1;
-                n2 = Integer.parseInt(content[1]) + 1;
-
-                weight = Integer.parseInt(content[2]);
-                // System.out.println("Creating Link between N" + n1 + " and N" + n2 + " with weight= " + weight);
-
-                node1 = net.getNodeByNodeId(n1);
-                node2 = net.getNodeByNodeId(n2);
-
-                if (node1 == null || node2 == null) {
-                    System.out.println("Unknow src or dst for link");
-                    continue;
-                }
-
-                linkCount++;
-                net.addEdge(node1, node2);
-
-            }
-        } catch (IOException e) {
-            System.out.println("IO Exception while reading topo file");
-        }
+//        // Read the topology first
+//        BufferedReader br = new BufferedReader(topoReader);  //creates a buffering character input stream  
+//        String line;
+//        String[] content, nodesLine;
+//        int nodeId, x, y, n1, n2, weight;
+//        Node swtch, node1, node2;
+//
+//        try {
+//            // read off the first two lead lines
+//            line = br.readLine();
+//            line = br.readLine();
+//
+//            nodesLine = line.split("\\s+");
+//            numFileNodes = Integer.parseInt(nodesLine[0]);
+//
+//            if (numFileNodes < numNodes) {
+//                System.out.println("Topo file has less nodes that required nodes");
+//                return;
+//            }
+//
+//            // first parse the nodes
+//            while (nodesRead < numFileNodes) {
+//                line = br.readLine();
+//                // System.out.println("Read line " + line + " from file");
+//                content = line.split("\\s+");
+//                nodeId = Integer.parseInt(content[0]) + 1; // avoid index 0
+//                x = Integer.parseInt(content[1]);
+//                y = Integer.parseInt(content[2]);
+//
+//                nodesRead++;
+//
+//                if (nodesRead > numNodes) {
+//                    continue;
+//                }
+//
+//                // System.out.println("Creating Node " + nodeId + " (x,y) = (" + x + ", " + y + ")");
+//                // offset x and y coordinates by 50 so that they don't hug the borders of the frame
+//                swtch = net.createNodeWithId(nodeId, Node.Type.OTHER, 0, x + 50, y + 50);
+//                nodeCount++;
+//            }
+//
+//            System.out.println("Created " + nodeCount + " nodes");
+//
+//            while ((line = br.readLine()) != null) {
+//
+//                // System.out.println("Read line " + line + " from file");
+//                content = line.split("\\s+");
+//
+//                n1 = Integer.parseInt(content[0]) + 1;
+//                n2 = Integer.parseInt(content[1]) + 1;
+//
+//                weight = Integer.parseInt(content[2]);
+//                // System.out.println("Creating Link between N" + n1 + " and N" + n2 + " with weight= " + weight);
+//
+//                node1 = net.getNodeByNodeId(n1);
+//                node2 = net.getNodeByNodeId(n2);
+//
+//                if (node1 == null || node2 == null) {
+//                    System.out.println("Unknow src or dst for link");
+//                    continue;
+//                }
+//
+//                linkCount++;
+//                net.addEdge(node1, node2);
+//
+//            }
+//        } catch (IOException e) {
+//            System.out.println("IO Exception while reading topo file");
+//        }
 
 //        System.out.println("Created " + net.graph.edgeSet().size() + " links");
     }
@@ -188,7 +219,8 @@ public class InetTopo {
         Flow flow;
 
         // System.out.println("Adding " + numFlows + " INITIAL flows");
-        for (int flowNum = 0; flowNum < numFlows; flowNum++) {
+        int flowsCreated = 0;
+        while (flowsCreated < numFlows) {
 
             if (readFlowsFromFile) {
                 try {
@@ -204,11 +236,16 @@ public class InetTopo {
 
                 srcNode = net.getNodeByNodeId(srcNodeId);
                 dstNode = net.getNodeByNodeId(dstNodeId);
-
+//                System.out.println("Creating flow between " + srcNodeId
+//                + " and " + dstNodeId + " from file");
                 flow = net.createFlowBetweenNodes(srcNode, dstNode, NetworkTest.DEFAULT_FLOW_RATE);
+                if(flow != null)
+                    flowsCreated++;
 
             } else {
-                createFlowBetweenRandomNodes(NetworkTest.DEFAULT_FLOW_RATE);
+                flow = createFlowBetweenRandomNodes(NetworkTest.DEFAULT_FLOW_RATE);
+                if(flow != null)
+                    flowsCreated++;
             }
 
         }
@@ -228,6 +265,7 @@ public class InetTopo {
     private Node findRandomValidEndNode(Node avoidNode) {
         Node node = null;
         int degree;
+        int numNodes = net.getNodes().values().size();
 
         while (node == null) {
             int nodeIx = (int) (Math.random() * (numNodes - 1));
@@ -236,6 +274,7 @@ public class InetTopo {
             if(node.equals(avoidNode)) {
                 
                 // make sure that it is not the node to be avoided
+                node = null;
                 continue;
             }
             
@@ -250,20 +289,21 @@ public class InetTopo {
 
     }
 
-    private void createFlowBetweenRandomNodes(int flowRate) {
+    private Flow createFlowBetweenRandomNodes(int flowRate) {
 
         Node srcNode, dstNode;
 
         srcNode = findRandomValidEndNode(null);
         dstNode = findRandomValidEndNode(srcNode);
 
-        //System.out.println("Creating flow between " + srcNode.toString() + " and " + dstNode.toString());
+//        System.out.println("Creating random flow between " + srcNode.toString() + " and " + dstNode.toString());
         Flow flow = net.createFlowBetweenNodes(srcNode, dstNode, flowRate);
 
-        // FRSR - temporarily disabling for FRSR
-//        if (!readFlowsFromFile) {
-//            demandWriter.println(srcNode.getNodeId() + " " + dstNode.getNodeId());
-//        }
+        if (!readFlowsFromFile && (flow !=null)) {
+            demandWriter.println(srcNode.getNodeId() + " " + dstNode.getNodeId());
+        }
+        
+        return flow;
 
     }
 

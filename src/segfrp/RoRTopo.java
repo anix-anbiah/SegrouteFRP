@@ -213,9 +213,10 @@ public class RoRTopo {
                     lastNode = node;
                 }
 
-//                if (height > 1 && (nd % 2 == 0)) {
-                if (height > 1 && (nd % 2 == 0)
-                        && (core || (nd != 2))) {
+                // if there are sub-rings, then create the sub-ring for this node
+                if (height > 1) {
+//                if (height > 1 && (nd % 2 == 0)
+//                        && (core || (nd != 2))) {
                     // create a child ring only IF
                     // (i) this is not a LEAF ring (last level)
                     // (ii) on an even node in the ring (create one child ring for 

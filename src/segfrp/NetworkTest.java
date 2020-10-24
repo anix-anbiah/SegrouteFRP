@@ -110,7 +110,7 @@ public class NetworkTest {
             rorTopo.createInitialFlows();
         } else if ("inet".equals(topo)) {
             System.out.println("Creating Inet Topo with " + topoArg1 + " nodes");
-            InetTopo inetTopo = new InetTopo(net, this, topoArg1, topoArg2, p, numFlows);
+            InetTopo inetTopo = new InetTopo(net, this, p, numFlows);
 
             net.createDsp();
 

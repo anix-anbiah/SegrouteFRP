@@ -524,6 +524,10 @@ public class Flow {
 
         return plen;
     }
+    
+    public int getShortestPathLength() {
+        return spath.getLength();
+    }
 
     public int getTilfaPrimaryPathLength() {
         return spath.getLength();
@@ -562,11 +566,27 @@ public class Flow {
     }
 
     // SBP Op Path length of the flow is the sum of op path lengths of the segments
-    public int getSbpOpPathLength() {
+    public int getSbpOpPathLength(boolean updateLinkStats) {
         int plen = 0;
+        GraphPath<Node,Link> opPath;
+        Iterator itr;
+        Link lnk;
 
         for (Segment seg : segmentsSBP) {
+            opPath = seg.getOpPath();
             plen += seg.getOpPathLength();
+            
+            if(!updateLinkStats) {
+                continue;
+            }
+            
+            // update the SBP operational flow count of 
+            // links in the operational path
+            itr = opPath.getEdgeList().iterator();
+            while(itr.hasNext()) {
+                lnk = (Link) itr.next();
+                lnk.addSbpOpFlow(this);
+            }
         }
 
         return plen;
@@ -595,7 +615,7 @@ public class Flow {
         return opstate;
     }
 
-    // Get the operationl state for TI-LFA
+    // Get the operationl state for TI-LFA or TI-MFA (based on boolean param)
     public int getTilfaOpstate(boolean timfa) {
 
         int spLen = 0;
@@ -631,8 +651,10 @@ public class Flow {
             }
 
             if (timfa) {
+                lnk.addTimfaOpFlow(this);
                 timfaOpPathlen++;
             } else {
+                lnk.addTilfaOpFlow(this);
                 tilfaOpPathlen++;
             }
         }
@@ -750,8 +772,10 @@ public class Flow {
             }
 
             if (timfa) {
+                lnk.addTimfaOpFlow(this);
                 timfaOpPathlen++;
             } else {
+                lnk.addTilfaOpFlow(this);
                 tilfaOpPathlen++;
             }
         }

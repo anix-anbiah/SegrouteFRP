@@ -69,11 +69,11 @@ public class Segment {
         if (getPrimaryOpstate() == Network.OPSTATE_UP) {
             return Network.OPSTATE_UP;
         }
-        
+
         // number of backup paths to check is the greater of
         // (i) maximum backups allowed by SBP
         // (ii) actual number of backups available
-        int backupsToCheck = (maxBackup > backupPaths.size())? backupPaths.size() : maxBackup;
+        int backupsToCheck = (maxBackup > backupPaths.size()) ? backupPaths.size() : maxBackup;
 
         // if any of the backup paths are UP, then the segment is in BACKUP state
         for (int i = 0; i < backupsToCheck; i++) {
@@ -109,20 +109,30 @@ public class Segment {
         this.backupOpstate[index] = opstate;
     }
 
-    public int getOpPathLength() {
-
+    public GraphPath<Node, Link> getOpPath() {
         if (getPrimaryOpstate() == Network.OPSTATE_UP) {
-            return getPrimary().getEdgeList().size();
+            return getPrimary();
         }
-        
+
         for (int i = 0; i < backupPaths.size(); i++) {
             if (backupOpstate[i] == Network.OPSTATE_UP) {
-                return getBackup(i).getEdgeList().size();
+                return getBackup(i);
             }
         }
 
-        System.out.println("Warning: Segment.getOpPathLength: Segment is not operational");
-        return -1;
+        return null;
+    }
+
+    public int getOpPathLength() {
+
+        GraphPath<Node, Link> opPath = getOpPath();
+        
+        if (opPath == null) {
+            System.out.println("Warning: Segment.getOpPathLength: Segment is not operational");
+            return -1;
+        }
+
+        return opPath.getEdgeList().size();
     }
 
     public void addInitialBackup(GraphPath<Node, Link> backup) {
@@ -256,7 +266,9 @@ public class Segment {
         System.out.println("Primary Path = " + primary.toString());
         if (type == SEGTYPE_PROTECTED) {
             System.out.println("Number of backups = " + backupPaths.size());
-            System.out.println("First Backup Path = " + backupPaths.get(0).toString());
+            if (backupPaths.size() > 0) {
+                System.out.println("First Backup Path = " + backupPaths.get(0).toString());
+            }
         }
     }
 
