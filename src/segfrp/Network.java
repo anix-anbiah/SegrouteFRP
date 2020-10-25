@@ -87,7 +87,7 @@ public class Network {
     protected static final int OPSTATE_DOWN = 2;
     protected static final int OPSTATE_BACKUP = 3; // operating using backup
 
-    protected static final int EDGE_WEIGHT_MAX = 50000;
+    protected static final int EDGE_WEIGHT_MAX = 100000;
 
 //    private final Sim_predicate triggerPred = new Sim_type_p(Message.Type.TRIGGER);
     public static int MAX_ROUNDS = 300;
@@ -1575,7 +1575,7 @@ public class Network {
                 // cumulative path len stats apply only for
                 // flows that are not dropped
                 cumulOpPrimaryPathLenSBP_7 += flow.getSbpPrimaryPathLength();
-                cumulOpPathLenSBP_7 += flow.getSbpOpPathLength(true);
+                cumulOpPathLenSBP_7 += flow.getSbpOpPathLength(false);
             }
 
             if (sbpOpstate_7 == Network.OPSTATE_BACKUP) {
