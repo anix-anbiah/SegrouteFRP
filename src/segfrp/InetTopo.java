@@ -260,6 +260,10 @@ public class InetTopo {
         } catch (IOException e) {
             System.out.println("IO Exception while closing reader or writer");
         }
+        
+        System.out.println("createInitialFlows: Inet topo: created " + flowsCreated + 
+                " flows");
+                
     }
 
     private Node findRandomValidEndNode(Node avoidNode) {

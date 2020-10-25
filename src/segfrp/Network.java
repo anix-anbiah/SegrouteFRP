@@ -86,7 +86,7 @@ public class Network {
     protected static final int OPSTATE_DOWN = 2;
     protected static final int OPSTATE_BACKUP = 3; // operating using backup
 
-    protected static final int EDGE_WEIGHT_MAX = 100000;
+    protected static final int EDGE_WEIGHT_MAX = 50000;
 
 //    private final Sim_predicate triggerPred = new Sim_type_p(Message.Type.TRIGGER);
     public static int MAX_ROUNDS = 300;
@@ -221,6 +221,8 @@ public class Network {
 
         // SRFRP- Making this Directed Graph
         graph = new DefaultDirectedWeightedGraph<>(Link.class);
+        
+        System.out.println("Created graph. Default weight = " + Graph.DEFAULT_EDGE_WEIGHT);
 
 //        // EXPERIMENTAL CODE TO TEST Graph ML Reader
 //        topoGraph = new DefaultDirectedWeightedGraph<>(Link.class);
@@ -491,14 +493,18 @@ public class Network {
     }
 
     protected void createDsp() {
-        if ((numFlows >= 10000) && "inet".equals(topo)) {
-            System.out.println("Creating Johnson SP");
-            dsp = new JohnsonShortestPaths(graph);
-        } else {
-            System.out.println("Creating Dijkstra SP");
-            dsp = new DijkstraShortestPath(graph);
-        }
+//        if ((numFlows >= 10000) && "inet".equals(topo)) {
+//            System.out.println("Creating Johnson SP");
+//            dsp = new JohnsonShortestPaths(graph);
+//        } else {
+//            System.out.println("Creating Dijkstra SP");
+//            dsp = new DijkstraShortestPath(graph);
+//        }
+        
+        System.out.println("Creating Dijkstra SP");
+        dsp = new DijkstraShortestPath(graph);
     }
+    
 
     protected ShortestPathAlgorithm getDsp() {
         return dsp;
@@ -887,6 +893,8 @@ public class Network {
             warning("Duplicate edge");
         }
 
+//        System.out.println("Link added with weight " + graph.getEdgeWeight(link));
+
         allLinks.add(link);
 
         // SRFRP - Change for DIRECTED GRAPH
@@ -895,6 +903,8 @@ public class Network {
         if (graph.addEdge(n2, n1, revlink) == false) {
             warning("Duplicate edge");
         }
+
+//        System.out.println("Rev Link added with weight " + graph.getEdgeWeight(revlink));
 
         allLinks.add(revlink);
 
@@ -1593,7 +1603,7 @@ public class Network {
 
         }
 
-        System.out.println("FLOW OPERATIONAL STATS");
+        System.out.println("FLOW STATS");
         System.out.println("============================");
 
         System.out.println("Total number of flows = " + flows.size());

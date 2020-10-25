@@ -748,8 +748,16 @@ public class Flow {
         net.graph.setEdgeWeight(localFailedLink, Network.EDGE_WEIGHT_MAX);
 
         failedLinks.add(localFailedLink);
+        
+//        System.out.println("Added failed link " + localFailedLink.toString());
 
         GraphPath<Node, Link> route = net.getShortestPath(lpr, dst);
+        
+//        System.out.println("findTilfaRouteState: repair path length = " + route.getLength());
+        
+        if(route.getLength() == 0) {
+            System.out.println("Get TI-LFA/MFA route: repair path is empty");
+        }
 
 //        System.out.println("Repair path = " + route.toString());
         // If it is TI-LFA, then LPR only uses the local failed link to
@@ -763,6 +771,12 @@ public class Flow {
         for (Link lnk : route.getEdgeList()) {
 
             if (failedLinks.contains(lnk)) {
+//                System.out.println("findTilfaRouteState: " + timfa +
+//                        " route contains failed link. " +
+//                        "Num failed links = " + failedLinks.size() +
+//                        ". Link weight = " + net.graph.getEdgeWeight(lnk) +
+//                        ". Link = " + lnk.toString());
+                
                 return Network.OPSTATE_DOWN;
             }
 
@@ -780,7 +794,7 @@ public class Flow {
             }
         }
 
-        // there are now downed links along the path
+        // there are no downed links along the path
         return Network.OPSTATE_UP;
 
     }
