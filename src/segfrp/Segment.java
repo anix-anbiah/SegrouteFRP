@@ -75,6 +75,10 @@ public class Segment {
         // (ii) actual number of backups available
         int backupsToCheck = (maxBackup > backupPaths.size()) ? backupPaths.size() : maxBackup;
 
+//        if (backupsToCheck > 5) {
+//            System.out.println("getOpstate: Checking more than 5 backup paths");
+//        }
+
         // if any of the backup paths are UP, then the segment is in BACKUP state
         for (int i = 0; i < backupsToCheck; i++) {
             if (backupOpstate[i] == Network.OPSTATE_UP) {
@@ -126,7 +130,7 @@ public class Segment {
     public int getOpPathLength() {
 
         GraphPath<Node, Link> opPath = getOpPath();
-        
+
         if (opPath == null) {
             System.out.println("Warning: Segment.getOpPathLength: Segment is not operational");
             return -1;
@@ -193,15 +197,19 @@ public class Segment {
         }
 
         if (backup == null) {
-            // unable to find an additional backup path
-//            System.out.println("Unable to find additional backup path between "
-//                    + src.toString() + " and " + dst.toString());
+            if (backupPaths.size() >= 5) {
+                System.out.println("Unable to find additional (>5) backup path between "
+                        + src.toString() + " and " + dst.toString());
+            }
             return;
         }
         // finally, add the new backup path 
 //        System.out.println("Additional backup path found between "
 //                + src.toString() + " and " + dst.toString());
         backupPaths.add(backup);
+
+        net.updateSbpMaxBackup(backupPaths.size());
+
 //        System.out.println("Total number of backups = " + backupPaths.size());
         return;
     }
