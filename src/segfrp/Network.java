@@ -712,8 +712,8 @@ public class Network {
         dumpln("# LINKSTAT SBP " + sbpTopLinksStr + " TILFA " + tilfaTopLinksStr
                 + " TIMFA " + timfaTopLinksStr);
 
-        dumpln("# PCSTAT SBP " +  sbpCumulTime/1000000 + "ms :: TILFA " +  tilfaCumulTime/1000000 + 
-                "ms :: TIMFA " + timfaCumulTime/1000000); 
+        dumpln("# PCSTAT SBP " +  sbpCumulTime/1000000 + " ms :: TILFA " +  tilfaCumulTime/1000000 + 
+                " ms :: TIMFA " + timfaCumulTime/1000000 + " ms"); 
         
 //        dumpln("# Max FTS = " + maxDomainFwdTableSize
 //                + " (Domain) :: " + maxHeuristicFwdTableSize + " (Heuristic); Avg "
