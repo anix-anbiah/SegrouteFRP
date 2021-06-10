@@ -137,8 +137,19 @@ public class Network {
     int numfails; // number of failures to simulate
     int maxSLD; // max segment list depth allowed
 
-    private long startTime;  // starting time of path computation (PC)
-    private long endTime;   // end time of HC
+    private long sbpStartTime;  // starting time of path computation (PC) for SBP
+    private long sbpEndTime;   // end time of PC for SBP
+    private long sbpCumulTime; // cumulative PC time for SBP
+    
+    private long tilfaStartTime; // starting time for path computation for TILFA
+    private long tilfaEndTime;   // end time of PC for TILFA
+    private long tilfaCumulTime; // cumulative PC time for TILFA
+    
+    private long timfaStartTime;  // starting time for path computation for TIMFA
+    private long timfaEndTime;    // ending time for PC for TIMFA
+    private long timfaCumulTime;  // cumulative PC time for TIMFA
+    
+    
 
     DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
     // private boolean DERIVE_SLD_FROM_P = true;
@@ -242,7 +253,10 @@ public class Network {
 
         networkTest = new NetworkTest(this, topo, ftTopoK, ftTopoH, numFlows, p, heuristic);
 
-        this.startTime = System.nanoTime();
+        // this.startTime = System.nanoTime();
+        this.sbpCumulTime = 0;
+        this.tilfaCumulTime = 0;
+        this.timfaCumulTime = 0;
 
         // System.out.println("Dumping all pairs path lengths");
         networkTest.addTopoAndInitialFlows();
@@ -310,7 +324,7 @@ public class Network {
 
         updateFlowOpstats();
 
-        this.endTime = System.nanoTime();
+   //     this.endTime = System.nanoTime();
 
         prettyPrint();
 
@@ -323,6 +337,14 @@ public class Network {
 //        }
         dumpInfo();
         writer.close();
+    }
+    
+    protected void addPCTime(long time, boolean timfa) {
+        if(timfa) {
+            timfaCumulTime += time;
+        } else {
+            tilfaCumulTime += time;
+        }
     }
 
     protected int getSEMetricType() {
@@ -690,6 +712,9 @@ public class Network {
         dumpln("# LINKSTAT SBP " + sbpTopLinksStr + " TILFA " + tilfaTopLinksStr
                 + " TIMFA " + timfaTopLinksStr);
 
+        dumpln("# PCSTAT SBP " +  sbpCumulTime/1000000 + "ms :: TILFA " +  tilfaCumulTime/1000000 + 
+                "ms :: TIMFA " + timfaCumulTime/1000000); 
+        
 //        dumpln("# Max FTS = " + maxDomainFwdTableSize
 //                + " (Domain) :: " + maxHeuristicFwdTableSize + " (Heuristic); Avg "
 //                + avgHeuristicFwdTableSize + " Total " + totalHeuristicFwdEntries + " :: Objective ");
@@ -934,19 +959,35 @@ public class Network {
             return null;
         }
 
+        this.sbpStartTime = System.nanoTime();
+        
         // compute the disjoint paths needed for SBP
         sbpPaths = getDisjointPaths(src, dst);
+        
+        this.sbpEndTime = System.nanoTime();
 
         if (sbpPaths.size() < 2) {
             System.out.println("Unable to find disjoint paths. Found " + sbpPaths.size() + " path(s)");
             return null;
+        } else {
+            // successful path compuation for SBP
+            this.sbpCumulTime += (this.sbpEndTime - this.sbpStartTime);
         }
 
 //        System.out.println("requesting path between " + src.getNodeName()
 //                + " and " + dst.getNodeName());
         // Now get the shortest path needed for TI-LFA
         if (path == null) {
+            this.tilfaStartTime = System.nanoTime();
+            
             spath = getShortestPath(src, dst);
+            
+            this.tilfaEndTime = System.nanoTime();
+            
+            // Initial PC time is applicable for both TILFA and TIMFA
+            this.tilfaCumulTime += (tilfaEndTime - tilfaStartTime);
+            this.timfaCumulTime += (tilfaEndTime - tilfaStartTime);
+            
         } else {
             spath = path;
         }
@@ -1776,6 +1817,10 @@ public class Network {
         System.out.println("Top congested links in SBP    " + sbpTopLinksStr);
         System.out.println("Top congested links in TI-LFA " + tilfaTopLinksStr);
         System.out.println("Top congested links in TI-MFA " + timfaTopLinksStr);
+        
+        System.out.println("\n============== PC stat =========================");
+        System.out.println("SBP " + sbpCumulTime/1000000 + " ms :: TILFA " + tilfaCumulTime/1000000 +
+                " ms :: TIMFA " + timfaCumulTime/1000000 + " ms");
 
     }
 

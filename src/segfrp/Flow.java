@@ -738,6 +738,8 @@ public class Flow {
     // to the destination. The local link that has failed and the list of
     // previously known failedlinks are also given
     private int findTilfaRouteState(Node lpr, Link localFailedLink, List<Link> failedLinks, boolean timfa) {
+        
+        long pcStartTime, pcEndTime;
 
 //        System.out.println("findTilfaRouteState: Flow Id " + getFlowId()
 //                + " from " + src + " to " + dst
@@ -750,8 +752,14 @@ public class Flow {
         failedLinks.add(localFailedLink);
         
 //        System.out.println("Added failed link " + localFailedLink.toString());
+        
+        pcStartTime = System.nanoTime();
 
         GraphPath<Node, Link> route = net.getShortestPath(lpr, dst);
+        
+        pcEndTime = System.nanoTime();
+        
+        net.addPCTime(pcEndTime-pcStartTime, timfa);
         
 //        System.out.println("findTilfaRouteState: repair path length = " + route.getLength());
         
