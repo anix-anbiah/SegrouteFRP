@@ -625,16 +625,9 @@ public class Flow {
         // check if any link along the shortest path of the flow is down
         for (Link lnk : spath.getEdgeList()) {
             if (lnk.getOpstate() == Network.OPSTATE_DOWN) {
-//                spLen = tilfaOpPathlen;
 
                 opstate = findTilfaRouteState(lnk.getSource(), lnk, failedLinks, timfa);
 
-//                System.out.println("getTilfaOpstate. Flow Id " + getFlowId()
-//                        + ". Op Path Len = " + tilfaOpPathlen
-//                        + ". Shortest Path len = " + spath.getEdgeList().size() 
-//                        + ". Initial unfailed path segment = " + spLen
-//                        + ". Num of failed links = " + failedLinks.size()
-//                        + ". Op state = " + ((tilfaOpstate == Network.OPSTATE_UP) ? "UP" : "DOWN"));
                 if (timfa) {
                     // restore all the failed links in the graph
                     for (Link flnk : failedLinks) {

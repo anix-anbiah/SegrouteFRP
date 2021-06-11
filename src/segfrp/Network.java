@@ -140,16 +140,14 @@ public class Network {
     private long sbpStartTime;  // starting time of path computation (PC) for SBP
     private long sbpEndTime;   // end time of PC for SBP
     private long sbpCumulTime; // cumulative PC time for SBP
-    
+
     private long tilfaStartTime; // starting time for path computation for TILFA
     private long tilfaEndTime;   // end time of PC for TILFA
     private long tilfaCumulTime; // cumulative PC time for TILFA
-    
+
     private long timfaStartTime;  // starting time for path computation for TIMFA
     private long timfaEndTime;    // ending time for PC for TIMFA
     private long timfaCumulTime;  // cumulative PC time for TIMFA
-    
-    
 
     DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
     // private boolean DERIVE_SLD_FROM_P = true;
@@ -324,8 +322,7 @@ public class Network {
 
         updateFlowOpstats();
 
-   //     this.endTime = System.nanoTime();
-
+        //     this.endTime = System.nanoTime();
         prettyPrint();
 
 //        if (NETGRAPH_ENABLED) {
@@ -338,9 +335,9 @@ public class Network {
         dumpInfo();
         writer.close();
     }
-    
+
     protected void addPCTime(long time, boolean timfa) {
-        if(timfa) {
+        if (timfa) {
             timfaCumulTime += time;
         } else {
             tilfaCumulTime += time;
@@ -694,7 +691,7 @@ public class Network {
                 + " :: PercentageOpIncrease " + percentageOpPathLenIncreaseSBP_5
                 + " :: SBP_7 "
                 + " :: PercetageDropped " + percentageDroppedFlowsSBP_7
-                + " :: PercentageOpIncrease " + percentageOpPathLenIncreaseSBP_7                
+                + " :: PercentageOpIncrease " + percentageOpPathLenIncreaseSBP_7
                 + " :: TILFA "
                 + " :: Dropped " + numDroppedFlowsTILFA
                 + " :: PercentageDropped " + percentageDroppedFlowsTILFA
@@ -712,9 +709,9 @@ public class Network {
         dumpln("# LINKSTAT SBP " + sbpTopLinksStr + " TILFA " + tilfaTopLinksStr
                 + " TIMFA " + timfaTopLinksStr);
 
-        dumpln("# PCSTAT SBP " +  sbpCumulTime/1000000 + " ms :: TILFA " +  tilfaCumulTime/1000000 + 
-                " ms :: TIMFA " + timfaCumulTime/1000000 + " ms"); 
-        
+        dumpln("# PCSTAT SBP " + sbpCumulTime / 1000000 + " ms :: TILFA " + tilfaCumulTime / 1000000
+                + " ms :: TIMFA " + timfaCumulTime / 1000000 + " ms");
+
 //        dumpln("# Max FTS = " + maxDomainFwdTableSize
 //                + " (Domain) :: " + maxHeuristicFwdTableSize + " (Heuristic); Avg "
 //                + avgHeuristicFwdTableSize + " Total " + totalHeuristicFwdEntries + " :: Objective ");
@@ -960,10 +957,10 @@ public class Network {
         }
 
         this.sbpStartTime = System.nanoTime();
-        
+
         // compute the disjoint paths needed for SBP
         sbpPaths = getDisjointPaths(src, dst);
-        
+
         this.sbpEndTime = System.nanoTime();
 
         if (sbpPaths.size() < 2) {
@@ -971,7 +968,8 @@ public class Network {
             return null;
         } else {
             // successful path compuation for SBP
-            this.sbpCumulTime += (this.sbpEndTime - this.sbpStartTime);
+            // Update- we are NOT counting the initial PC time
+            // this.sbpCumulTime += (this.sbpEndTime - this.sbpStartTime);
         }
 
 //        System.out.println("requesting path between " + src.getNodeName()
@@ -979,15 +977,15 @@ public class Network {
         // Now get the shortest path needed for TI-LFA
         if (path == null) {
             this.tilfaStartTime = System.nanoTime();
-            
+
             spath = getShortestPath(src, dst);
-            
+
             this.tilfaEndTime = System.nanoTime();
-            
+
             // Initial PC time is applicable for both TILFA and TIMFA
-            this.tilfaCumulTime += (tilfaEndTime - tilfaStartTime);
-            this.timfaCumulTime += (tilfaEndTime - tilfaStartTime);
-            
+            // Update - we are NOT counting the initial cumul time
+            // this.tilfaCumulTime += (tilfaEndTime - tilfaStartTime);
+            // this.timfaCumulTime += (tilfaEndTime - tilfaStartTime);
         } else {
             spath = path;
         }
@@ -1463,7 +1461,10 @@ public class Network {
     private int cumulOpPathLenSBP_5;
     private int cumulOpPathLenSBP_7;
 
+    private int numBackupFlowsTILFA;
     private int cumulOpPathLenTILFA;
+
+    private int numBackupFlowsTIMFA;
     private int cumulOpPathLenTIMFA;
 
     private double avgPrimaryPathLenSBP;
@@ -1503,9 +1504,9 @@ public class Network {
     private int[] timfaTopLinks = new int[NUM_TOP_LINKS];
 
     private String sbpTopLinksStr, tilfaTopLinksStr, timfaTopLinksStr;
-    
+
     public void updateSbpMaxBackup(int maxbackup) {
-        if(sbpMaxBackup < maxbackup) {
+        if (sbpMaxBackup < maxbackup) {
             sbpMaxBackup = maxbackup;
         }
     }
@@ -1543,9 +1544,11 @@ public class Network {
 
         cumulOpPrimaryPathLenTILFA = 0;
         cumulOpPathLenTILFA = 0;
+        numBackupFlowsTILFA = 0;
 
         cumulOpPrimaryPathLenTIMFA = 0;
         cumulOpPathLenTIMFA = 0;
+        numBackupFlowsTIMFA = 0;
 
         int sbpOpstate_1, sbpOpstate_3, sbpOpstate_5, sbpOpstate_7, tilfaOpstate, timfaOpstate;
 
@@ -1627,6 +1630,7 @@ public class Network {
             if (tilfaOpstate == Network.OPSTATE_DOWN) {
                 numDroppedFlowsTILFA++;
             } else {
+                numBackupFlowsTILFA++;
                 cumulOpPrimaryPathLenTILFA += flow.getTilfaPrimaryPathLength();
                 cumulOpPathLenTILFA += flow.getTilfaOpPathLength();
             }
@@ -1635,6 +1639,7 @@ public class Network {
             if (timfaOpstate == Network.OPSTATE_DOWN) {
                 numDroppedFlowsTIMFA++;
             } else {
+                numBackupFlowsTIMFA++;
                 cumulOpPrimaryPathLenTIMFA += flow.getTimfaPrimaryPathLength();
                 cumulOpPathLenTIMFA += flow.getTimfaOpPathLength();
             }
@@ -1786,7 +1791,7 @@ public class Network {
         System.out.println("Average Op path length = " + avgOpPathLenSBP_5);
         System.out.println("Percentage Op increase = "
                 + percentageOpPathLenIncreaseSBP_5 + "%");
-        
+
         System.out.println("\n============ SBP-7 Operational =================");
         System.out.println("Number of dropped flows SBP-7 " + numDroppedFlowsSBP_7 + " ("
                 + percentageDroppedFlowsSBP_7 + "%)");
@@ -1795,11 +1800,12 @@ public class Network {
         System.out.println("Average Op primary path length = " + avgOpPrimaryPathLenSBP_7);
         System.out.println("Average Op path length = " + avgOpPathLenSBP_7);
         System.out.println("Percentage Op increase = "
-                + percentageOpPathLenIncreaseSBP_7 + "%");        
+                + percentageOpPathLenIncreaseSBP_7 + "%");
 
         System.out.println("\n============ TILFA Operational ================");
         System.out.println("Number of dropped flows TILFA " + numDroppedFlowsTILFA + " ("
                 + percentageDroppedFlowsTILFA + "%)");
+        System.out.println("Number of flows in BACKUP state " + numBackupFlowsTILFA);
         System.out.println("Average Op primary path length = " + avgOpPrimaryPathLenTILFA);
         System.out.println("Average Op path length = " + avgOpPathLenTILFA);
         System.out.println("Percentage Op increase = "
@@ -1808,6 +1814,7 @@ public class Network {
         System.out.println("\n============ TIMFA Operational ================");
         System.out.println("Number of dropped flows TIMFA " + numDroppedFlowsTIMFA + " ("
                 + percentageDroppedFlowsTIMFA + "%)");
+        System.out.println("Number of flows in BACKUP state " + numBackupFlowsTIMFA);
         System.out.println("Average Op primary path length = " + avgOpPrimaryPathLenTIMFA);
         System.out.println("Average Op path length = " + avgOpPathLenTIMFA);
         System.out.println("Percentage Op increase = "
@@ -1817,10 +1824,13 @@ public class Network {
         System.out.println("Top congested links in SBP    " + sbpTopLinksStr);
         System.out.println("Top congested links in TI-LFA " + tilfaTopLinksStr);
         System.out.println("Top congested links in TI-MFA " + timfaTopLinksStr);
-        
+
         System.out.println("\n============== PC stat =========================");
-        System.out.println("SBP " + sbpCumulTime/1000000 + " ms :: TILFA " + tilfaCumulTime/1000000 +
-                " ms :: TIMFA " + timfaCumulTime/1000000 + " ms");
+        System.out.println("SBP " + sbpCumulTime / 1000000 
+                + " ms :: TILFA " + tilfaCumulTime / 1000000
+                + " ms for " + numBackupFlowsTILFA + " backup flows "   
+                + " :: TIMFA " + timfaCumulTime / 1000000 
+                + " ms for " + numBackupFlowsTIMFA + " backup flows");
 
     }
 
