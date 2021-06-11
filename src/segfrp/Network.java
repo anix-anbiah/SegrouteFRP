@@ -710,7 +710,9 @@ public class Network {
                 + " TIMFA " + timfaTopLinksStr);
 
         dumpln("# PCSTAT SBP " + sbpCumulTime / 1000000 + " ms :: TILFA " + tilfaCumulTime / 1000000
-                + " ms :: TIMFA " + timfaCumulTime / 1000000 + " ms");
+                + " ms for " + numBackupFlowsTILFA + " backup flows "
+                + " :: TIMFA " + timfaCumulTime / 1000000 
+                + " ms for " + numBackupFlowsTIMFA + " backup flows ");
 
 //        dumpln("# Max FTS = " + maxDomainFwdTableSize
 //                + " (Domain) :: " + maxHeuristicFwdTableSize + " (Heuristic); Avg "
@@ -1826,10 +1828,10 @@ public class Network {
         System.out.println("Top congested links in TI-MFA " + timfaTopLinksStr);
 
         System.out.println("\n============== PC stat =========================");
-        System.out.println("SBP " + sbpCumulTime / 1000000 
+        System.out.println("SBP " + sbpCumulTime / 1000000
                 + " ms :: TILFA " + tilfaCumulTime / 1000000
-                + " ms for " + numBackupFlowsTILFA + " backup flows "   
-                + " :: TIMFA " + timfaCumulTime / 1000000 
+                + " ms for " + numBackupFlowsTILFA + " backup flows "
+                + " :: TIMFA " + timfaCumulTime / 1000000
                 + " ms for " + numBackupFlowsTIMFA + " backup flows");
 
     }
